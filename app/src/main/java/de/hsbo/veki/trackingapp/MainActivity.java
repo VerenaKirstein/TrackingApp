@@ -1,5 +1,6 @@
 package de.hsbo.veki.trackingapp;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -8,6 +9,7 @@ import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -40,16 +42,21 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
+        // Wir prüfen, ob Menü-Element mit der ID "action_daten_aktualisieren"
+        // ausgewählt wurde und geben eine Meldung aus
         int id = item.getItemId();
+        if (id == R.id.action_username) {
+            // Toast.makeText(getApplicationContext(), "Aktualisieren gedrückt!", Toast.LENGTH_LONG).show();
+            Intent username_intent = new Intent(this, changeUsername.class);
+            startActivity(username_intent);
 
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
             return true;
         }
-
         return super.onOptionsItemSelected(item);
+    }
+
+    public void readUsername() {
+
+
     }
 }
