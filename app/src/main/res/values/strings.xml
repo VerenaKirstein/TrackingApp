@@ -2,4 +2,5 @@
     <string name="app_name">TrackingApp</string>
     <string name="action_username">Benutzer ändern</string>
     <string name="change_username">Benutzernamen ändern</string>
+    <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/PositionTracker/FeatureServer/0</string>
 </resources>

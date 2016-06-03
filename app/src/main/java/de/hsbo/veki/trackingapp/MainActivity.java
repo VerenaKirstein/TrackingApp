@@ -22,6 +22,8 @@ import android.view.MenuItem;
 import android.widget.Toast;
 import android.widget.TextView;
 
+import com.esri.android.map.MapView;
+import com.esri.android.map.ags.ArcGISFeatureLayer;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
@@ -33,16 +35,21 @@ import com.google.android.gms.location.LocationSettingsResult;
 import java.text.DateFormat;
 import java.util.Date;
 
-public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,LocationListener {
+public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
     private GoogleApiClient mGoogleApiClient;
     private Location mLastLocation;
     private TextView mLatitudeText;
-    private TextView  mBewGeschw;
+    private TextView mBewGeschw;
     private TextView mLongitudeText;
-    private int GPS_INTERVAL =1000;
+    private int GPS_INTERVAL = 1000;
     private int GPS_FASTEST_INTERVAL = 1000;
     private LocationRequest mLocationRequest;
+
+    // The MapView.
+    MapView mMapView = null;
+    ArcGISFeatureLayer featureLayer = null;
+    String mFeatureServiceURL;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,28 +68,40 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         });
 
+        // Retrieve the map and initial extent from XML layout
+        mMapView = (MapView) findViewById(R.id.map);
+        // Enable map to wrap around date line.
+        mMapView.enableWrapAround(true);
+
+        mFeatureServiceURL = this.getResources().getString(R.string.FeatureLayerURL);
+        featureLayer = new ArcGISFeatureLayer(mFeatureServiceURL, ArcGISFeatureLayer.MODE.ONDEMAND);
+        mMapView.addLayer(featureLayer);
+
+
+
         // Create an instance of GoogleAPIClient.
-            checkGPS();
-            createGoogleApiClient();
+        checkGPS();
+        createGoogleApiClient();
 
     }
 
-private  void checkGPS(){
+    private void checkGPS() {
 
-    LocationManager service = (LocationManager) getSystemService(LOCATION_SERVICE);
-    boolean enabled = service
-            .isProviderEnabled(LocationManager.GPS_PROVIDER);
+        LocationManager service = (LocationManager) getSystemService(LOCATION_SERVICE);
+        boolean enabled = service
+                .isProviderEnabled(LocationManager.GPS_PROVIDER);
 
-// check if enabled and if not send user to the GSP settings
-// Better solution would be to display a dialog and suggesting to
-// go to the settings
-    if (!enabled) {
-        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-        startActivity(intent);
+        // check if enabled and if not send user to the GSP settings
+        // Better solution would be to display a dialog and suggesting to
+        // go to the settings
+        if (!enabled) {
+            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(intent);
+        }
+
     }
 
-}
-    protected synchronized void  createGoogleApiClient(){
+    protected synchronized void createGoogleApiClient() {
         if (mGoogleApiClient == null) {
             mGoogleApiClient = new GoogleApiClient.Builder(this)
                     .addConnectionCallbacks(this)
@@ -148,15 +167,15 @@ private  void checkGPS(){
 
     @Override
     public void onConnected(Bundle bundle) {
-       if(Build.VERSION.SDK_INT >= 23 &&ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED){
-           return;
-       }
+        if (Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
                 mGoogleApiClient);
         if (mLastLocation != null) {
-            mLatitudeText =(TextView) findViewById(R.id.GPSLatText);
-            mLongitudeText =(TextView) findViewById(R.id.GPSLonText);
+            mLatitudeText = (TextView) findViewById(R.id.GPSLatText);
+            mLongitudeText = (TextView) findViewById(R.id.GPSLonText);
             mBewGeschw = (TextView) findViewById(R.id.BwGeschw);
             mLatitudeText.setText(String.valueOf(mLastLocation.getLatitude()));
             mLongitudeText.setText(String.valueOf(mLastLocation.getLongitude()));
@@ -164,7 +183,6 @@ private  void checkGPS(){
         }
 
     }
-
 
 
     @Override

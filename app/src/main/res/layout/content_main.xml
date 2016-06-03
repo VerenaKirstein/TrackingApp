@@ -13,27 +13,54 @@
     tools:showIn="@layout/activity_main">
 
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:orientation="horizontal">
+        android:layout_marginTop="0dp"
+        android:orientation="horizontal"
+        android:layout_marginLeft="0dp"
+        android:layout_marginRight="0dp"
+        android:id="@+id/linearLayout">
 
         <TextView
             android:id="@+id/GPSLonText"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:hint="GPSLon"
+            android:height="40dp" />
 
         <TextView
             android:id="@+id/GPSLatText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="20dp" />
+            android:layout_marginLeft="20dp"
+            android:hint="GPSLat"
+            android:height="40dp" />
 
         <TextView
             android:id="@+id/BwGeschw"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="20dp" />
+            android:layout_marginLeft="20dp"
+            android:hint="Geschw"
+            android:height="40dp" />
 
     </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/linearLayout">
+
+        <com.esri.android.map.MapView
+            android:id="@+id/map"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            mapoptions.MapType="OSM"
+            mapoptions.center="51.447776, 7.271262"
+            mapoptions.ZoomLevel="12">
+        </com.esri.android.map.MapView>
+
+    </LinearLayout>
+
+
 </RelativeLayout>
