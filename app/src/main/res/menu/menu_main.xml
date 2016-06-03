@@ -2,6 +2,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="de.hsbo.veki.trackingapp.MainActivity">
+
+    <item android:id="@+id/action_location_found"
+        android:icon="@android:drawable/ic_menu_mylocation"
+        android:title="@string/action_location_found"
+        app:showAsAction="ifRoom|collapseActionView" />/>
+
     <item
         android:id="@+id/action_username"
         android:orderInCategory="100"

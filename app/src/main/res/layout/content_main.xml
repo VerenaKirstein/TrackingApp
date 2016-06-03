@@ -44,6 +44,12 @@
             android:hint="Geschw"
             android:height="40dp" />
 
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="New Button"
+            android:id="@+id/button" />
+
     </LinearLayout>
 
     <LinearLayout

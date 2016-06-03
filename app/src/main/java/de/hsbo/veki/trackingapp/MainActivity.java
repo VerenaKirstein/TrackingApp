@@ -1,9 +1,13 @@
 package de.hsbo.veki.trackingapp;
 
+import android.app.ActionBar;
+import android.content.Context;
 import android.content.Intent;
 import android.Manifest;
-import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -16,11 +20,12 @@ import android.support.design.widget.Snackbar;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.view.MenuInflater;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.Toast;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.esri.android.map.MapView;
 import com.esri.android.map.ags.ArcGISFeatureLayer;
@@ -32,10 +37,12 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResult;
 
-import java.text.DateFormat;
-import java.util.Date;
-
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+
+    public static final String PREFS_NAME = "TRACKINGAPP";
+    SharedPreferences sharedpreferences;
+
+
 
     private GoogleApiClient mGoogleApiClient;
     private Location mLastLocation;
@@ -45,6 +52,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private int GPS_INTERVAL = 1000;
     private int GPS_FASTEST_INTERVAL = 1000;
     private LocationRequest mLocationRequest;
+
+    //private Button button;
 
     // The MapView.
     MapView mMapView = null;
@@ -68,6 +77,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         });
 
+
         // Retrieve the map and initial extent from XML layout
         mMapView = (MapView) findViewById(R.id.map);
         // Enable map to wrap around date line.
@@ -78,10 +88,20 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mMapView.addLayer(featureLayer);
 
 
-
         // Create an instance of GoogleAPIClient.
         checkGPS();
         createGoogleApiClient();
+
+        // Read Username from Device
+        sharedpreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String username = sharedpreferences.getString("username", "");
+
+        // TODO: Hier ggf. nicht passend! (in andere Methode)
+        if (username.isEmpty()) {
+            Toast.makeText(getApplicationContext(), "Bitte Benutzername eingeben!", Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(getApplicationContext(), "Eingeloggt als: " + username + ".", Toast.LENGTH_LONG).show();
+        }
 
     }
 
@@ -136,7 +156,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.menu_main, menu);
+
         return true;
     }
 
@@ -154,15 +176,30 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     public boolean onOptionsItemSelected(MenuItem item) {
         // Wir prüfen, ob Menü-Element mit der ID "action_daten_aktualisieren"
         // ausgewählt wurde und geben eine Meldung aus
-        int id = item.getItemId();
-        if (id == R.id.action_username) {
-            // Toast.makeText(getApplicationContext(), "Aktualisieren gedrückt!", Toast.LENGTH_LONG).show();
-            Intent username_intent = new Intent(this, changeUsername.class);
-            startActivity(username_intent);
 
-            return true;
+        switch (item.getItemId()) {
+
+            case R.id.action_username:
+                Intent username_intent = new Intent(this, ChangeUsernameActivity.class);
+                startActivity(username_intent);
+                return true;
+
+            case R.id.action_location_found:
+
+                // TODO: Beginne Tracken
+                Toast.makeText(getApplicationContext(), "We will track you!", Toast.LENGTH_LONG).show();
+
+                return true;
+
+            default:
+                return super.onOptionsItemSelected(item);
+
         }
-        return super.onOptionsItemSelected(item);
+
+
+
+
+
     }
 
     @Override
@@ -217,8 +254,5 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     }
 
-    public void readUsername() {
 
-
-    }
 }
