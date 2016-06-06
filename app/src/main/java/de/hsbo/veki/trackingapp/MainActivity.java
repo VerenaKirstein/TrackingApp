@@ -8,8 +8,10 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -38,9 +40,12 @@ import com.esri.core.geodatabase.Geodatabase;
 import com.esri.core.geodatabase.GeodatabaseFeature;
 import com.esri.core.geodatabase.GeodatabaseFeatureTable;
 import com.esri.core.geodatabase.GeodatabaseFeatureTableEditErrors;
+import com.esri.core.geometry.Envelope;
 import com.esri.core.geometry.GeometryEngine;
+import com.esri.core.geometry.LinearUnit;
 import com.esri.core.geometry.Point;
 import com.esri.core.geometry.SpatialReference;
+import com.esri.core.geometry.Unit;
 import com.esri.core.map.CallbackListener;
 import com.esri.core.map.Feature;
 import com.esri.core.map.Graphic;
@@ -53,9 +58,12 @@ import com.esri.core.tasks.geodatabase.GeodatabaseSyncTask;
 import com.esri.core.tasks.geodatabase.SyncGeodatabaseParameters;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResult;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -63,9 +71,12 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+
+import static java.lang.String.*;
 
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
@@ -114,6 +125,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     // Attributes for UI
     private Button button;
+    private MenuItem carCheckbox = null;
+    private MenuItem pedestrianCheckbox = null;
+    private MenuItem bicycleCheckbox = null;
 
 
 
@@ -138,10 +152,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         // Set Context
         MainActivity.setContext(this);
 
+        // Load TextViews
         mLatitudeText = (TextView) findViewById(R.id.GPSLatText);
         mLongitudeText = (TextView) findViewById(R.id.GPSLonText);
         mBewGeschw = (TextView) findViewById(R.id.BwGeschw);
 
+        // Load Button
         button = (Button) findViewById(R.id.button);
 
         // Create an instance of GoogleAPIClient.
@@ -188,7 +204,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         // Add layer to map
         featureLayer = new ArcGISFeatureLayer(featureLayerURL, ArcGISFeatureLayer.MODE.ONDEMAND);
-        mMapView.addLayer(featureLayer);
+        //mMapView.addLayer(featureLayer);
 
         //open the local geodatabase file
         try {
@@ -284,12 +300,15 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             public void onClick(View view) {
 
                 Context context = getApplicationContext();
-                Toast.makeText(context, "test sync!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
                 try {
                     syncGeodatabase();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+
+                mMapView.removeAll();
+                mMapView.addLayer(offlineFeatureLayer);
             }
         });
 
@@ -316,6 +335,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
 
+    /**
+     * Converts long Date to String Date
+     * @param date
+     * @return
+     */
     static String convertDateToString(Long date) {
 
         SimpleDateFormat df2 = new SimpleDateFormat("dd.MM.yy");
@@ -324,8 +348,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
 
-
-
+    /**
+     * Create Filegeodatabase
+     * @param featureServiceUrl
+     */
 
     private void createFilegeodatabase(String featureServiceUrl) {
         Log.i(TAG, "Create GeoDatabase");
@@ -352,8 +378,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
 
-
-    /*private void checkGPS() {
+    private void checkGPS() {
 
         LocationManager service = (LocationManager) getSystemService(LOCATION_SERVICE);
         boolean enabled = service
@@ -367,9 +392,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             startActivity(intent);
         }
 
-    }*/
+    }
 
-    /*protected synchronized void createGoogleApiClient() {
+    protected synchronized void createGoogleApiClient() {
         if (mGoogleApiClient == null) {
             mGoogleApiClient = new GoogleApiClient.Builder(this)
                     .addConnectionCallbacks(this)
@@ -378,9 +403,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                     .build();
             createLocationRequest();
         }
-    }*/
+    }
 
-   /* protected void createLocationRequest() {
+    protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
         mLocationRequest.setInterval(GPS_INTERVAL);
         mLocationRequest.setFastestInterval(GPS_FASTEST_INTERVAL);
@@ -391,7 +416,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         PendingResult<LocationSettingsResult> result =
                 LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient,
                         builder.build());
-    }*/
+    }
 
 
     /*private void updateUI() {
@@ -407,7 +432,40 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_main, menu);
 
+        carCheckbox = menu.getItem(1).getSubMenu().getItem(0);
+        pedestrianCheckbox = menu.getItem(1).getSubMenu().getItem(1);
+        bicycleCheckbox = menu.getItem(1).getSubMenu().getItem(2);
+
+        String getVehicle = sharedpreferences.getString("vehicle", "");
+
+        switch (getVehicle) {
+            case "Auto":
+                carCheckbox.setChecked(true);
+            case "Fußgänger":
+                pedestrianCheckbox.setChecked(true);
+            case "Fahrrad":
+                bicycleCheckbox.setChecked(true);
+            default:
+                pedestrianCheckbox.setChecked(true);
+                setVehicle("Fußgänger");
+
+        }
+
+        getVehicle = sharedpreferences.getString("vehicle", "");
+        Toast.makeText(getApplicationContext(), "oncreate: " + getVehicle + " gesetzt", Toast.LENGTH_LONG).show();
         return true;
+    }
+
+    public void setVehicle(String vehicle) {
+        SharedPreferences.Editor editor = sharedpreferences.edit();
+
+        String username = sharedpreferences.getString("username", "");
+
+        editor.clear();
+
+        editor.putString("vehicle", vehicle);
+        editor.putString("username", username);
+        editor.commit();
     }
 
     protected void onStart() {
@@ -441,6 +499,24 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
                 return true;
 
+            case R.id.carMenuItem:
+                setVehicle("Auto");
+                carCheckbox.setChecked(true);
+                Log.e("carMenuItem", sharedpreferences.getString("vehicle", ""));
+                return true;
+
+            case R.id.pedestrianMenuItem:
+                setVehicle("Fußgänger");
+                pedestrianCheckbox.setChecked(true);
+                Log.e("pedestMenuItem", sharedpreferences.getString("vehicle", ""));
+                return true;
+
+            case R.id.bicycleMenuItem:
+                setVehicle("Fahrrad");
+                bicycleCheckbox.setChecked(true);
+                Log.e("bicyMenuItem", sharedpreferences.getString("vehicle", ""));
+                return true;
+
             default:
                 return super.onOptionsItemSelected(item);
 
@@ -449,42 +525,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     }
 
-    @Override
-   /* public void onConnected(Bundle bundle) {
-
-        if (Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        *//*mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-        if (mLastLocation != null) {
-            mLatitudeText = (TextView) findViewById(R.id.GPSLatText);
-            mLongitudeText = (TextView) findViewById(R.id.GPSLonText);
-            mBewGeschw = (TextView) findViewById(R.id.BwGeschw);
-            mLatitudeText.setText(String.valueOf(mLastLocation.getLatitude()));
-            mLongitudeText.setText(String.valueOf(mLastLocation.getLongitude()));
-            mBewGeschw.setText(String.valueOf(mLastLocation.getSpeed()));
-        }*//*
-
-        mLocationRequest = LocationRequest.create();
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(10000);
-        mLocationRequest.setFastestInterval(5000);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return;
-        }
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-
-    }*/
 
     public void onConnected(Bundle bundle) {
+
         mLocationRequest = LocationRequest.create();
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         mLocationRequest.setInterval(30000);
@@ -516,14 +559,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     @Override
     public void onLocationChanged(Location location) {
-        //mLastLocation = location;
-        //updateUI();
-
-        //mLocationLayer.removeAll();
 
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-        mLatitudeText.setText(String.valueOf(location.getLatitude()));
-        mLongitudeText.setText(String.valueOf(location.getLongitude()));
+        mLatitudeText.setText(valueOf(location.getLatitude()));
+        mLongitudeText.setText(valueOf(location.getLongitude()));
         Toast.makeText(this, "Updated: " + mLastUpdateTime, Toast.LENGTH_SHORT).show();
 
 
@@ -536,15 +575,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 SpatialReference.create(4326),
                 mMapView.getSpatialReference());
 
-        /*Unit mapUnit = mMapView.getSpatialReference().getUnit();
-        double zoomWidth = Unit.convertUnits(1000,
-                Unit.create(LinearUnit.Code.KILOMETER), mapUnit);
-        Envelope zoomExtent = new Envelope(mLocation,
-                zoomWidth / 10, zoomWidth / 10);
-        mMapView.setExtent(zoomExtent);*/
 
         // create marker symbol to represent location
-        SimpleMarkerSymbol resultSymbol = new SimpleMarkerSymbol(Color.RED, 16, SimpleMarkerSymbol.STYLE.CIRCLE);
+        SimpleMarkerSymbol resultSymbol = new SimpleMarkerSymbol(Color.RED, 16, SimpleMarkerSymbol.STYLE.CROSS);
         // create graphic object for resulting location
         Graphic resultLocGraphic = new Graphic(mLocation, resultSymbol);
         // add graphic to location layer
@@ -554,9 +587,15 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         //make a map of attributes
         Map<String, Object> attributes = new HashMap<String, Object>();
         attributes.put("ID", "1");
-        attributes.put("Username", "Thorsten");
-        attributes.put("Vehicle", "Bike");
-        attributes.put("Date", "04.06.2016");
+        attributes.put("Username", sharedpreferences.getString("username", ""));
+        attributes.put("Vehicle", sharedpreferences.getString("vehicle", ""));
+
+        DateFormat df = new SimpleDateFormat("dd.MM.yy");
+        String date = df.format(Calendar.getInstance().getTime());
+
+        attributes.put("Date", date);
+
+        // TODO: Datum ist noch falsch in der Attributtabelle gespeichert
 
         try {
             addFeature(attributes, mLocation);
@@ -565,30 +604,54 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         }
 
 
-        // Add Features direct on ArcGISFeatureLayer
-//        FeatureTemplate template = featureLayer.getTemplates()[0];
-//
-//        Graphic newFeatureGraphic = featureLayer.createFeatureWithTemplate(template, mLocation);
-//
-//        // Pass array of additions to applyEdits as first parameter.
-//        Graphic[] adds = {newFeatureGraphic};
-//        featureLayer.applyEdits(adds, null, null, new CallbackListener<FeatureEditResult[][]>() {
-//
-//            public void onError(Throwable error) {
-//                // Implement error handling code here
-//            }
-//
-//            public void onCallback(FeatureEditResult[][] editResult) {
-//                // Check the response for success or failure
-//                if (editResult[0] != null && editResult[0][0] != null && editResult[0][0].isSuccess()) {
-//                    // Implement any required success logic here
-//                }
-//            }
-//        });
+        /**
+         * Sync Feature direct on ArcGIS-Feature-Layer
+         */
+/*         Add Features direct on ArcGISFeatureLayer
+        FeatureTemplate template = featureLayer.getTemplates()[0];
+
+        Graphic newFeatureGraphic = featureLayer.createFeatureWithTemplate(template, mLocation);
+
+        // Pass array of additions to applyEdits as first parameter.
+        Graphic[] adds = {newFeatureGraphic};
+        featureLayer.applyEdits(adds, null, null, new CallbackListener<FeatureEditResult[][]>() {
+
+            public void onError(Throwable error) {
+                // Implement error handling code here
+            }
+
+            public void onCallback(FeatureEditResult[][] editResult) {
+                // Check the response for success or failure
+                if (editResult[0] != null && editResult[0][0] != null && editResult[0][0].isSuccess()) {
+                    // Implement any required success logic here
+                }
+            }
+        });*/
 
 
     }
 
+    /**
+     * Zoom to a given Location
+     * @param loc - Centerpoint
+     */
+
+    public void zoomToLocation(Point loc) {
+
+        Unit mapUnit = mMapView.getSpatialReference().getUnit();
+        double zoomWidth = Unit.convertUnits(1000, Unit.create(LinearUnit.Code.KILOMETER), mapUnit);
+        Envelope zoomExtent = new Envelope(loc, zoomWidth / 10, zoomWidth / 10);
+        mMapView.setExtent(zoomExtent);
+
+    }
+
+    /**
+     * Add Feature to local Filegeodatabase
+     *
+     * @param attr - Metainformation
+     * @param p - ArcGIS Point
+     * @throws Exception
+     */
     public void addFeature(Map attr, Point p) throws Exception {
 
         try {
@@ -602,23 +665,17 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             Log.e(TAG, "added fid = " + fid + " " + geomStr);
 
 
-
         } catch (TableException e) {
             // report errors, e.g. to console
             Log.e(TAG, "", e);
         }
 
-
-
-
-
-
-
-
-
     }
 
-
+    /**
+     * Syncronice local Filegeodatabase with ArcGIS-Feature-Layer
+     * @throws Exception
+     */
     public void syncGeodatabase() throws Exception {
         //Log.i(TAG, "Sync geodatabase from " + DEFAULT_GDB_PATH);
         SyncGeodatabaseParameters params = geodatabase.getSyncParameters();
@@ -645,34 +702,15 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         gdbSyncTask = new GeodatabaseSyncTask(featureServiceURL, null);
 
-
-
         Log.e("PARARMS: ", params.toString());
         gdbSyncTask.syncGeodatabase(params, geodatabase, syncStatusCallback, callback);
     }
 
 
-   /* @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
-
-    }*/
-
-
-        /**
-         * Set up parameters to pass the the  method. A
-         * {@link CallbackListener} is used for the response.
-         */
-
+    /**
+     * Create Filegeodatabase
+     * @param featureServerInfo
+     */
     private static void createGeodatabase(FeatureServiceInfo featureServerInfo) {
         // set up the parameters to generate a geodatabase
         GenerateGeodatabaseParameters params = new GenerateGeodatabaseParameters(
@@ -722,6 +760,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 gdbResponseCallback);
     }
 
+
     /**
      * Request database, poll server to get status, and download the file
      */
@@ -732,6 +771,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         gdbSyncTask.generateGeodatabase(params, file, false, statusCallback,
                 gdbResponseCallback);
     }
+
 
     /**
      * Add feature layer from local geodatabase to map
@@ -761,6 +801,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         }
     }
 
+
+    /**
+     * Show progressbar for creating Filegeodatabase
+     * @param activity
+     * @param message
+     */
     private static void showProgressBar(final MainActivity activity, final String message) {
         activity.runOnUiThread(new Runnable() {
 
@@ -772,29 +818,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         });
     }
 
-    /**********************************************************************************************/
-
-    // Diese Methode liefert den Pfad zu Geodatabase im Asset Ordner
-    String getFilePath(String fileName) {
-        File f = new File(getCacheDir() + fileName);
-        if (!f.exists())
-            try {
-
-                InputStream is = getAssets().open(fileName);
-                int size = is.available();
-                byte[] buffer = new byte[size];
-                is.read(buffer);
-                is.close();
-
-                FileOutputStream fos = new FileOutputStream(f);
-                fos.write(buffer);
-                fos.close();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-
-        return f.getPath();
-    }
 
     // methods to ensure context is available when updating the progress dialog
     public static Context getContext() {

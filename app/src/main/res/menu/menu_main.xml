@@ -6,11 +6,35 @@
     <item android:id="@+id/action_location_found"
         android:icon="@android:drawable/ic_menu_mylocation"
         android:title="@string/action_location_found"
-        app:showAsAction="ifRoom|collapseActionView" />/>
+        app:showAsAction="ifRoom|collapseActionView" />
 
     <item
         android:id="@+id/action_username"
         android:orderInCategory="100"
         android:title="@string/action_username"
         app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_vehicle"
+        android:title="@string/vehicle"
+        app:showAsAction="never" >
+        <menu>
+        <group android:checkableBehavior="single">
+            <item
+                android:id="@+id/carMenuItem"
+                app:showAsAction="never"
+                android:title="@string/car" />
+            <item
+                android:id="@+id/pedestrianMenuItem"
+                app:showAsAction="never"
+                android:title="@string/pedestrian" />
+            <item
+                android:id="@+id/bicycleMenuItem"
+                app:showAsAction="never"
+                android:title="@string/bicycle" />
+
+        </group>
+    </menu>
+    </item>
+
 </menu>
