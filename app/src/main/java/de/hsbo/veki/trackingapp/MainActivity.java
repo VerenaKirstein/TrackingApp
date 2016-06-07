@@ -119,8 +119,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private TextView mLatitudeText;
     private TextView mBewGeschw;
     private TextView mLongitudeText;
-    private int GPS_INTERVAL = 1000;
-    private int GPS_FASTEST_INTERVAL = 1000;
+    private int GPS_INTERVAL = 10000;
+    private int GPS_FASTEST_INTERVAL = 2000;
     private LocationRequest mLocationRequest;
     private String mLastUpdateTime;
     private Point mLocation;
@@ -526,17 +526,20 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             case R.id.carMenuItem:
                 setVehicle("Auto");
                 carCheckbox.setChecked(true);
+                mLocationRequest.setInterval(2000);
                 Log.e("carMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.pedestrianMenuItem:
                 setVehicle("Fußgänger");
+                mLocationRequest.setInterval(10000);
                 pedestrianCheckbox.setChecked(true);
                 Log.e("pedestMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.bicycleMenuItem:
                 setVehicle("Fahrrad");
+                mLocationRequest.setInterval(3000);
                 bicycleCheckbox.setChecked(true);
                 Log.e("bicyMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
@@ -548,7 +551,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
 
     }
-    
+
 
 
     public void onConnected(Bundle bundle) {
@@ -558,7 +561,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             return;
         }
         createLocationRequest();
-        startLocationUpdates();
+        if(menu.getItem(0).isChecked()){
+        startLocationUpdates();}
+        else {
+            stopLocationUpdates();
+        }
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
                 mGoogleApiClient);
         // LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
@@ -637,9 +644,23 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     @Override
     public void onLocationChanged(Location location) {
 
+        if(mLocation!=null)
+        updateGraphic(mLocation);
+
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
+
         mLatitudeText.setText(valueOf(location.getLatitude()));
         mLongitudeText.setText(valueOf(location.getLongitude()));
+        double distance = Math.sqrt(Math.pow(mLastLocation.getLatitude()-location.getLatitude(),2)+ Math.pow(mLastLocation.getLongitude()-location.getLongitude(),2));
+       //TODO calculate time difference
+        int time =(int)Calendar.getInstance().getTime().getTime() - (int)Calendar.getInstance().getTime().getTime();
+        if(time!= 0) {
+            double geschw = distance / time;
+            mBewGeschw.setText(valueOf(geschw));
+        }
+        else{
+            mBewGeschw.setText(valueOf(0.0));
+        }
         Toast.makeText(this, "Updated: " + mLastUpdateTime, Toast.LENGTH_SHORT).show();
 
 
@@ -705,6 +726,17 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         });*/
 
+
+    }
+
+    private void updateGraphic(Point nLocation) {
+       //TODO symbol sollte sich ändern;
+
+        SimpleMarkerSymbol resultSymbolact = new SimpleMarkerSymbol(Color.RED, 16, SimpleMarkerSymbol.STYLE.DIAMOND);
+
+        Graphic resultLocGraphic = new Graphic(nLocation, resultSymbolact);
+        // add graphic to location layer
+        mLocationLayer.updateGraphic(mLocationLayer.getGraphicIDs()[mLocationLayer.getNumberOfGraphics()-1],resultLocGraphic);
 
     }
 
