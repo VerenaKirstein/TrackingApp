@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
@@ -16,6 +17,7 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
@@ -25,6 +27,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -121,15 +124,18 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private LocationRequest mLocationRequest;
     private String mLastUpdateTime;
     private Point mLocation;
-
+    private boolean mGPSActive = false;
+    private boolean useGooglePlayService = true;
+    private LocationManager locationManager;
+    private android.location.LocationListener locationListener;
+    private Location mLastLocation;
 
     // Attributes for UI
     private Button button;
-    private MenuItem carCheckbox = null;
+    private Menu menu;
+    private MenuItem carCheckbox; //= null;
     private MenuItem pedestrianCheckbox = null;
     private MenuItem bicycleCheckbox = null;
-
-
 
 
     @Override
@@ -140,14 +146,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
 
         // Set Context
         MainActivity.setContext(this);
@@ -160,14 +158,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         // Load Button
         button = (Button) findViewById(R.id.button);
 
-        // Create an instance of GoogleAPIClient.
-        if (mGoogleApiClient == null) {
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this)
-                    .addApi(LocationServices.API)
-                    .build();
-        }
+        checkGPS();
+        createGoogleApiClient();
+
 
         // Get resource names
         demoDataFile = Environment.getExternalStorageDirectory();
@@ -202,85 +195,104 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mMapView.setEsriLogoVisible(true);
         mMapView.enableWrapAround(true);
 
+
         // Add layer to map
-        featureLayer = new ArcGISFeatureLayer(featureLayerURL, ArcGISFeatureLayer.MODE.ONDEMAND);
-        //mMapView.addLayer(featureLayer);
+        featureLayer = new
+
+                ArcGISFeatureLayer(featureLayerURL, ArcGISFeatureLayer.MODE.ONDEMAND);
+
+        mMapView.addLayer(featureLayer);
 
         //open the local geodatabase file
-        try {
+        try
+
+        {
             geodatabase = new Geodatabase(createGeodatabaseFilePath());
-        } catch (FileNotFoundException e) {
+            //create a feature layer and add it to the map
+            geodatabaseFeatureTable = geodatabase.getGeodatabaseFeatureTableByLayerId(0);
+            //create a feature layer and add it to the map
+            offlineFeatureLayer = new FeatureLayer(geodatabaseFeatureTable);
+
+            mMapView.addLayer(offlineFeatureLayer);
+        } catch (
+                FileNotFoundException e
+                )
+
+        {
             e.printStackTrace();
         }
 
-        //create a feature layer and add it to the map
-        geodatabaseFeatureTable = geodatabase.getGeodatabaseFeatureTableByLayerId(0);
-        //create a feature layer and add it to the map
-        offlineFeatureLayer = new FeatureLayer(geodatabaseFeatureTable);
-        mMapView.addLayer(offlineFeatureLayer);
+    //create a feature layer and add it to the map
+  //  geodatabaseFeatureTable = geodatabase.getGeodatabaseFeatureTableByLayerId(0);
+    //create a feature layer and add it to the map
+    //offlineFeatureLayer = new FeatureLayer(geodatabaseFeatureTable);
+
+    //mMapView.addLayer(offlineFeatureLayer);
 
 
         // Add Listener
-        mMapView.setOnSingleTapListener(new OnSingleTapListener() {
+        mMapView.setOnSingleTapListener(new
 
-            private static final long serialVersionUID = 1L;
+                                                OnSingleTapListener() {
 
-            @Override
-            public void onSingleTap(float x, float y) {
+                                                    private static final long serialVersionUID = 1L;
 
-                long[] selectedFeatures = offlineFeatureLayer.getFeatureIDs(x, y, 25, 1);
+                                                    @Override
+                                                    public void onSingleTap(float x, float y) {
 
-                if (selectedFeatures.length > 0) {
+                                                        long[] selectedFeatures = offlineFeatureLayer.getFeatureIDs(x, y, 25, 1);
 
-                    // Feature is selected
-                    offlineFeatureLayer.selectFeatures(selectedFeatures, false);
+                                                        if (selectedFeatures.length > 0) {
 
-                    if (selectedFeatures != null && selectedFeatures.length > 0) {
+                                                            // Feature is selected
+                                                            offlineFeatureLayer.selectFeatures(selectedFeatures, false);
 
-                        callout = mMapView.getCallout();
+                                                            if (selectedFeatures != null && selectedFeatures.length > 0) {
 
-                        //Style
-                        callout.setStyle(R.xml.tracked_point);
-                        Feature fpktNr = offlineFeatureLayer.getFeature(selectedFeatures[0]);
-                        String id = fpktNr.getAttributeValue("ID").toString();
-                        String username = fpktNr.getAttributeValue("Username").toString();
-                        String vehicle = fpktNr.getAttributeValue("Vehicle").toString();
-                        Long date = (Long) fpktNr.getAttributeValue("Date");
-                        Log.e("Date", date.toString());
-                        callout.setContent(loadView(id, username, vehicle, date));
-                        //callout.setMaxHeight(240);
-                        //callout.setMaxWidth(600);
-                        callout.show((Point) fpktNr.getGeometry());
+                                                                callout = mMapView.getCallout();
 
-
-                    } else {
-                        if (callout != null && callout.isShowing()) {
-                            callout.hide();
-                        }
-                    }
-
-                } else {
-                    // Wenn kein Punkt getroffen wurde wird nachfolgende Meldung gezeigt
-                    // Toast.makeText(getApplicationContext(), "No Point selected", Toast.LENGTH_SHORT).show();
-
-                    callout.hide();
-
-                    // Selektion aufheben
-                    offlineFeatureLayer.clearSelection();
-                }
-            }
-
-            private View loadView(String id, String username, String vehicle, Long date) {
-                View view = LayoutInflater.from(MainActivity.this).inflate(R.layout.pointinfo, null);
-                final TextView textNummer = (TextView) view.findViewById(R.id.popup);
-                String out = "ID: " + id + "\nUsername: " + username + "\nVehicle: " + vehicle + "\nDate: " + convertDateToString(date);
-                textNummer.setText(out); //" ID: " + id + "\n Username: " + username + "\n Vehrkehrsmittel: " + vehicle + "\n Datum: " + date);
-
-                return view;
-            }
+                                                                //Style
+                                                                callout.setStyle(R.xml.tracked_point);
+                                                                Feature fpktNr = offlineFeatureLayer.getFeature(selectedFeatures[0]);
+                                                                String id = fpktNr.getAttributeValue("ID").toString();
+                                                                String username = fpktNr.getAttributeValue("Username").toString();
+                                                                String vehicle = fpktNr.getAttributeValue("Vehicle").toString();
+                                                                Long date = (Long) fpktNr.getAttributeValue("Date");
+                                                                Log.e("Date", date.toString());
+                                                                callout.setContent(loadView(id, username, vehicle, date));
+                                                                //callout.setMaxHeight(240);
+                                                                //callout.setMaxWidth(600);
+                                                                callout.show((Point) fpktNr.getGeometry());
 
 
-        });
+                                                            } else {
+                                                                if (callout != null && callout.isShowing()) {
+                                                                    callout.hide();
+                                                                }
+                                                            }
+
+                                                        } else {
+                                                            // Wenn kein Punkt getroffen wurde wird nachfolgende Meldung gezeigt
+                                                            // Toast.makeText(getApplicationContext(), "No Point selected", Toast.LENGTH_SHORT).show();
+
+                                                            callout.hide();
+
+                                                            // Selektion aufheben
+                                                            offlineFeatureLayer.clearSelection();
+                                                        }
+                                                    }
+
+                                                    private View loadView(String id, String username, String vehicle, Long date) {
+                                                        View view = LayoutInflater.from(MainActivity.this).inflate(R.layout.pointinfo, null);
+                                                        final TextView textNummer = (TextView) view.findViewById(R.id.popup);
+                                                        String out = "ID: " + id + "\nUsername: " + username + "\nVehicle: " + vehicle + "\nDate: " + convertDateToString(date);
+                                                        textNummer.setText(out); //" ID: " + id + "\n Username: " + username + "\n Vehrkehrsmittel: " + vehicle + "\n Datum: " + date);
+
+                                                        return view;
+                                                    }
+
+
+                                                });
 
 
         // Read Username from Device
@@ -312,11 +324,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         });
 
-        // Create an instance of GoogleAPIClient.
-        // checkGPS();
-        // createGoogleApiClient();
-
     }
+
 
     /*
     * Create the geodatabase file location and name structure
@@ -337,6 +346,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     /**
      * Converts long Date to String Date
+     *
      * @param date
      * @return
      */
@@ -350,6 +360,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     /**
      * Create Filegeodatabase
+     *
      * @param featureServiceUrl
      */
 
@@ -370,6 +381,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             @Override
             public void onCallback(FeatureServiceInfo fsInfo) {
                 if (fsInfo.isSyncEnabled()) {
+                    Log.i(TAG,"IS Sync Enabled, create Geodatabase");
                     createGeodatabase(fsInfo);
                 }
             }
@@ -401,12 +413,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                     .addOnConnectionFailedListener(this)
                     .addApi(LocationServices.API)
                     .build();
-            createLocationRequest();
+
         }
     }
 
     protected void createLocationRequest() {
-        mLocationRequest = new LocationRequest();
+        mLocationRequest = LocationRequest.create();
         mLocationRequest.setInterval(GPS_INTERVAL);
         mLocationRequest.setFastestInterval(GPS_FASTEST_INTERVAL);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
@@ -429,6 +441,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
+        this.menu=menu;
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_main, menu);
 
@@ -454,6 +467,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         getVehicle = sharedpreferences.getString("vehicle", "");
         Toast.makeText(getApplicationContext(), "oncreate: " + getVehicle + " gesetzt", Toast.LENGTH_LONG).show();
         return true;
+
     }
 
     public void setVehicle(String vehicle) {
@@ -493,11 +507,21 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 return true;
 
             case R.id.action_location_found:
+                if (!item.isChecked()) {
+                    controlGPS();
+                    item.setChecked(true);
+                    item.setIcon(R.drawable.gps_on);
+                    item.getIcon();
+                    Toast.makeText(getApplicationContext(), "Start Tracking", Toast.LENGTH_SHORT).show();
+                    return true;
+                } else {
+                    controlGPS();
+                    item.setChecked(false);
+                    item.setIcon(R.drawable.gps_off);
+                    Toast.makeText(getApplicationContext(), "Stop Tracking", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
 
-                // TODO: Beginne Tracken
-                Toast.makeText(getApplicationContext(), "We will track you!", Toast.LENGTH_LONG).show();
-
-                return true;
 
             case R.id.carMenuItem:
                 setVehicle("Auto");
@@ -524,27 +548,80 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
 
     }
+    
 
 
     public void onConnected(Bundle bundle) {
 
-        mLocationRequest = LocationRequest.create();
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(30000);
-        mLocationRequest.setFastestInterval(15000);
+
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
             return;
         }
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+        createLocationRequest();
+        startLocationUpdates();
+        mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
+                mGoogleApiClient);
+        // LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
     }
 
+
+    private void startSimpleLocationUpdates() {
+        // Register the listener with the Location Manager to receive location updates
+        if (Build.VERSION.SDK_INT >= 23 &&
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        // Register the listener with the Location Manager to receive location updates
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0.5f, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0.5f, locationListener);
+
+    }
+
+    private void stopSimpleLocationUpdates() {
+
+        if (Build.VERSION.SDK_INT >= 23 &&
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        // Remove the listener you previously added
+        locationManager.removeUpdates(locationListener);
+    }
+
+    protected void stopLocationUpdates() {
+        if (mGoogleApiClient.isConnected()) {
+
+            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+            mGPSActive = false;
+        }
+    }
+
+    private void startLocationUpdates() {
+        if (mGoogleApiClient.isConnected()) {
+            if (Build.VERSION.SDK_INT >= 23 &&
+                    ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return;
+            }
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+            mGPSActive = true;
+
+        }
+    }
+
+    public void controlGPS() {
+        if (useGooglePlayService) {
+            if (mGPSActive == true) {
+                stopLocationUpdates();
+            } else {
+                startLocationUpdates();
+            }
+        } else {
+            if (mGPSActive == true) {
+                stopSimpleLocationUpdates();
+            } else {
+                startSimpleLocationUpdates();
+            }
+        }
+    }
 
     @Override
     public void onConnectionSuspended(int i) {
@@ -566,12 +643,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         Toast.makeText(this, "Updated: " + mLastUpdateTime, Toast.LENGTH_SHORT).show();
 
 
-        double locy = location.getLatitude();
-        double locx = location.getLongitude();
+        double locY = location.getLatitude();
+        double locX = location.getLongitude();
 
-        Point wgspoint = new Point(locx, locy);
+        Point wgsPoint = new Point(locX, locY);
 
-        mLocation = (Point) GeometryEngine.project(wgspoint,
+        mLocation = (Point) GeometryEngine.project(wgsPoint,
                 SpatialReference.create(4326),
                 mMapView.getSpatialReference());
 
@@ -633,6 +710,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     /**
      * Zoom to a given Location
+     *
      * @param loc - Centerpoint
      */
 
@@ -649,7 +727,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
      * Add Feature to local Filegeodatabase
      *
      * @param attr - Metainformation
-     * @param p - ArcGIS Point
+     * @param p    - ArcGIS Point
      * @throws Exception
      */
     public void addFeature(Map attr, Point p) throws Exception {
@@ -674,6 +752,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     /**
      * Syncronice local Filegeodatabase with ArcGIS-Feature-Layer
+     *
      * @throws Exception
      */
     public void syncGeodatabase() throws Exception {
@@ -686,6 +765,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             public void onCallback(final Map<Integer, GeodatabaseFeatureTableEditErrors> paramT) {
                 Log.i(TAG, "Sync Complete: " + (paramT == null || paramT.size() == 0 ? "Success" : "Fail"));
             }
+
             @Override
             public void onError(final Throwable paramThrowable) {
                 Log.i(TAG, "Sync Error: ", paramThrowable);
@@ -709,6 +789,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     /**
      * Create Filegeodatabase
+     *
      * @param featureServerInfo
      */
     private static void createGeodatabase(FeatureServiceInfo featureServerInfo) {
@@ -804,6 +885,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     /**
      * Show progressbar for creating Filegeodatabase
+     *
      * @param activity
      * @param message
      */
