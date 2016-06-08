@@ -4,7 +4,7 @@
     tools:context="de.hsbo.veki.trackingapp.MainActivity">
 
     <item android:id="@+id/action_location_found"
-        android:icon="@drawable/gps_on"
+        android:icon="@drawable/gps_on_highres"
         android:alpha="0.5"
         android:title="@string/action_location_found"
         android:checked="true"
