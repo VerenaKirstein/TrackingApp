@@ -7,6 +7,7 @@
     <string name="car">Auto</string>
     <string name="pedestrian">Fußgänger</string>
     <string name="bicycle">Fahrrad</string>
+    <string name="automatic">Automatisch erkennen</string>
 
     <string name="action_location_found">GPS</string>
     <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdb</string>
