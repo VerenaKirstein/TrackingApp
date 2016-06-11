@@ -1,14 +1,18 @@
 package de.hsbo.veki.trackingapp;
 
 import android.Manifest;
+import android.app.PendingIntent;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -16,6 +20,7 @@ import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
@@ -50,9 +55,15 @@ import com.esri.core.map.Graphic;
 import com.esri.core.symbol.SimpleMarkerSymbol;
 import com.esri.core.tasks.geodatabase.GeodatabaseSyncTask;
 import com.esri.core.tasks.query.QueryParameters;
+import com.esri.core.tasks.query.QueryTask;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.Result;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.location.ActivityRecognition;
+import com.google.android.gms.location.ActivityRecognitionResult;
+import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
@@ -63,13 +74,15 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 import static java.lang.String.*;
 
-public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener, ResultCallback {
 
 
     // Attributes for Android usage
@@ -114,7 +127,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private TextView mBewGeschw;
     private TextView mLongitudeText;
     private int GPS_INTERVAL = 10000;
-    private int GPS_FASTEST_INTERVAL = 2000;
+    private int GPS_FASTEST_INTERVAL = GPS_INTERVAL/2;
     private LocationRequest mLocationRequest;
     private String mLastUpdateTime;
     private Point mLocation;
@@ -123,6 +136,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private LocationManager locationManager;
     private android.location.LocationListener locationListener;
     private Location mLastLocation;
+    protected ActivityDetectionBroadcastReceiver mBroadcastReceiver;
+    private ArrayList<DetectedActivity> mDetectedActivities;
+
 
     // Attributes for UI
     private Button button;
@@ -155,7 +171,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         // Load Button
         button = (Button) findViewById(R.id.button);
-
+        mBroadcastReceiver = new ActivityDetectionBroadcastReceiver();
+        mDetectedActivities = new ArrayList<DetectedActivity>();
+        // Set the confidence level of each monitored activity to zero.
+        for (int i = 0; i < Constants.MONITORED_ACTIVITIES.length; i++) {
+            mDetectedActivities.add(new DetectedActivity(Constants.MONITORED_ACTIVITIES[i], 0));
+        }
         checkGPS();
         createGoogleApiClient();
 
@@ -429,11 +450,52 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             mGoogleApiClient = new GoogleApiClient.Builder(this)
                     .addConnectionCallbacks(this)
                     .addOnConnectionFailedListener(this)
-                    .addApi(LocationServices.API)
+                    .addApi(LocationServices.API).addApi(ActivityRecognition.API)
                     .build();
-
+            createLocationRequest();
         }
     }
+
+    public void requestActivityUpdates() {
+        if (!mGoogleApiClient.isConnected()) {
+            Toast.makeText(this, "Not connected",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(
+                mGoogleApiClient,
+                Constants.DETECTION_INTERVAL_IN_MILLISECONDS,
+                getActivityDetectionPendingIntent()
+        ).setResultCallback(this);
+        Log.i(TAG,"REquets");
+    }
+
+    public void removeActivityUpdates() {
+        if(menu.getItem(0)!=null && menu.getItem(0).isVisible())
+            menu.getItem(0).setVisible(false);
+
+        if (!mGoogleApiClient.isConnected()) {
+            Toast.makeText(this, "Not Connected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // Remove all activity updates for the PendingIntent that was used to request activity
+        // updates.
+        ActivityRecognition.ActivityRecognitionApi.removeActivityUpdates(
+                mGoogleApiClient,
+                getActivityDetectionPendingIntent()
+        ).setResultCallback(this);
+
+        Log.i(TAG,"RemoveActivityUpdates");
+    }
+
+    private PendingIntent getActivityDetectionPendingIntent() {
+        Intent intent = new Intent(this, DetectedActivitiesIntentService.class);
+
+        // We use FLAG_UPDATE_CURRENT so that we get the same pending intent back when calling
+        // requestActivityUpdates() and removeActivityUpdates().
+        return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
 
     protected void createLocationRequest() {
         mLocationRequest = LocationRequest.create();
@@ -463,10 +525,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_main, menu);
 
-        carCheckbox = menu.getItem(1).getSubMenu().getItem(0);
-        pedestrianCheckbox = menu.getItem(1).getSubMenu().getItem(1);
-        bicycleCheckbox = menu.getItem(1).getSubMenu().getItem(2);
-        autoCheckbox = menu.getItem(1).getSubMenu().getItem(3);
+        carCheckbox = menu.getItem(2).getSubMenu().getItem(0);
+        pedestrianCheckbox = menu.getItem(2).getSubMenu().getItem(1);
+        bicycleCheckbox = menu.getItem(2).getSubMenu().getItem(2);
+        autoCheckbox = menu.getItem(2).getSubMenu().getItem(3);
 
         String getVehicle = sharedpreferences.getString("vehicle", "");
 
@@ -513,12 +575,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         if (mGoogleApiClient.isConnected()) {
             mGoogleApiClient.disconnect();
         }
+        removeActivityUpdates();
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Wir prüfen, ob Menü-Element mit der ID "action_daten_aktualisieren"
-        // ausgewählt wurde und geben eine Meldung aus
 
         switch (item.getItemId()) {
 
@@ -546,6 +607,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
             case R.id.carMenuItem:
                 setVehicle("Auto");
+                removeActivityUpdates();
                 carCheckbox.setChecked(true);
                 mLocationRequest.setInterval(2000);
                 Log.e("carMenuItem", sharedpreferences.getString("vehicle", ""));
@@ -553,6 +615,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
             case R.id.pedestrianMenuItem:
                 setVehicle("Fußgänger");
+                removeActivityUpdates();
                 mLocationRequest.setInterval(10000);
                 pedestrianCheckbox.setChecked(true);
                 Log.e("pedestMenuItem", sharedpreferences.getString("vehicle", ""));
@@ -560,9 +623,15 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
             case R.id.bicycleMenuItem:
                 setVehicle("Fahrrad");
-                mLocationRequest.setInterval(3000);
+                removeActivityUpdates();
                 bicycleCheckbox.setChecked(true);
                 Log.e("bicyMenuItem", sharedpreferences.getString("vehicle", ""));
+                return true;
+
+            case R.id.auto:
+                setVehicle("Automatisch erkennen");
+                requestActivityUpdates();
+                autoCheckbox.setChecked(true);
                 return true;
 
             default:
@@ -575,21 +644,77 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
 
 
+public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
+
+        menu.getItem(0).setVisible(true);
+
+    int confidenceLevel =0;
+    int number=0;
+    for(int i =0 ;i<detectedActivities.size();i++){
+
+        int confidence = detectedActivities.get(i).getConfidence();
+
+        if(confidenceLevel<confidence){
+            confidenceLevel = confidence;
+             number = i;
+            Log.i(TAG,"Number "+ number + " conf " +confidenceLevel);
+        }
+
+    }
+    Log.i(TAG, "detected act " +detectedActivities.get(number).getType());
+        switch (detectedActivities.get(number).getType()) {
+
+            case 1:
+                menu.getItem(0).setIcon(R.drawable.bike);
+
+            case 0:
+                menu.getItem(0).setIcon(R.drawable.car);
+
+            case 2:
+                menu.getItem(0).setIcon(R.drawable.walking);
+
+            case 8:
+                menu.getItem(0).setIcon(R.drawable.running);
+
+            case 3:
+                menu.getItem(0).setIcon(R.drawable.still);
+                Log.i(TAG,"Hallo");
+
+            case 5:
+                menu.getItem(0).setIcon(R.drawable.tilting);
+
+            case 4:
+                menu.getItem(0).setIcon(R.drawable.questionmark);
+
+            case 7:
+                menu.getItem(0).setIcon(R.drawable.walking);
+
+
+
+        }
+
+}
+
     public void onConnected(Bundle bundle) {
 
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        createLocationRequest();
-        if(menu.getItem(0).isChecked()){
-        startLocationUpdates();}
+       // createLocationRequest();
+        if(menu.getItem(1).isChecked()){
+            if(useGooglePlayService){
+                startLocationUpdates();
+            }
+            else{
+                startSimpleLocationUpdates();
+            }
+        }
         else {
             stopLocationUpdates();
         }
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
                 mGoogleApiClient);
-        // LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
     }
 
 
@@ -650,6 +775,14 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         }
     }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Register the broadcast receiver that informs this activity of the DetectedActivity
+        // object broadcast sent by the intent service.
+        LocalBroadcastManager.getInstance(this).registerReceiver(mBroadcastReceiver,
+                new IntentFilter(Constants.BROADCAST_ACTION));
+    }
 
     @Override
     public void onConnectionSuspended(int i) {
@@ -665,32 +798,37 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     @Override
     public void onLocationChanged(Location location) {
 
+        Point oldLoc = new Point();
         double locY = location.getLatitude();
         double locX = location.getLongitude();
 
         Point wgsPoint = new Point(locX, locY);
 
+        if(mLocation!= null){
+             oldLoc = mLocation;
+        }
+
         mLocation = (Point) GeometryEngine.project(wgsPoint,
                 SpatialReference.create(4326),
                 mMapView.getSpatialReference());
 
-        if(mLocation!=null)
+        if(mLocation!=null) {
             updateGraphic(mLocation);
+        }
+        if(oldLoc.isEmpty()==false){
+            double distance = Math.sqrt(Math.pow(oldLoc.getX() - mLocation.getX(), 2) + Math.pow(oldLoc.getY() - mLocation.getY(), 2));
+            double geschw = distance / (GPS_INTERVAL/1000);
+            geschw = Math.round(geschw*100)/100.0;
+            mBewGeschw.setText(valueOf(geschw + " m/s"));
+        }
+        else{
+            mBewGeschw.setText(valueOf(0.0+ " m/s"));
+        }
 
         mLatitudeText.setText(valueOf(location.getLatitude()));
         mLongitudeText.setText(valueOf(location.getLongitude()));
-        double distance = Math.sqrt(Math.pow(mLastLocation.getLatitude()-location.getLatitude(),2)+ Math.pow(mLastLocation.getLongitude()-location.getLongitude(),2));
-       //TODO calculate time difference
-        int time =(int)Calendar.getInstance().getTime().getTime() - (int)Calendar.getInstance().getTime().getTime();
-        if(time!= 0) {
-            double geschw = distance / time;
-            mBewGeschw.setText(valueOf(geschw));
-        }
-        else{
-            mBewGeschw.setText(valueOf(0.0));
-        }
-        Toast.makeText(this, "Updated: " + mLastUpdateTime, Toast.LENGTH_SHORT).show();
 
+        mLastLocation = location;
 
         //make a map of attributes
         Map<String, Object> attributes = new HashMap<String, Object>();
@@ -700,9 +838,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         DateFormat datef = new SimpleDateFormat("dd.MM.yyyy");
         String date = datef.format(Calendar.getInstance().getTime());
+        mLastUpdateTime=date;
 
         attributes.put("Date", date);
-
+        Toast.makeText(this, "Updated: " + mLastUpdateTime, Toast.LENGTH_SHORT).show();
 
         try {
             trackGeodatabase.addFeature(attributes, mLocation);
@@ -713,7 +852,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
     private void updateGraphic(Point nLocation) {
-       //TODO symbol sollte sich ändern;
 
         SimpleMarkerSymbol resultSymbolact = new SimpleMarkerSymbol(Color.RED, 16, SimpleMarkerSymbol.STYLE.DIAMOND);
 
@@ -771,9 +909,17 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mContext = context;
     }
 
+    @Override
+    public void onResult(@NonNull Result result) {
+        if (result.getStatus().isSuccess()) {
+        }
+        else {
+            Log.e(TAG, "Error adding or removing activity detection: " + result.getStatus().getStatusMessage());
+        }
+    }
 
 
-    /*private class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
+    private class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
         @Override
         protected FeatureResult doInBackground(String... params) {
 
@@ -827,7 +973,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             // Set the map extent to the envelope containing the result graphics
             mMapView.setExtent(extent, 100);
         }
-    }*/
+    }
 
 
     public void showToast(final String message) {
@@ -840,5 +986,16 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         });
     }
-}
 
+    public class ActivityDetectionBroadcastReceiver extends BroadcastReceiver {
+        protected static final String TAG = "activity-det-resp-rec";
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            ArrayList<DetectedActivity> updatedActivities =
+                    intent.getParcelableArrayListExtra(Constants.ACTIVITY_EXTRA);
+            setIconActivity(updatedActivities);
+
+        }
+    }
+}

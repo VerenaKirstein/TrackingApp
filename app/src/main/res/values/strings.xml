@@ -9,7 +9,18 @@
     <string name="bicycle">Fahrrad</string>
     <string name="automatic">Automatisch erkennen</string>
 
+    <string name="in_vehicle">In a vehicle</string>
+    <string name="on_bicycle">On a bicycle</string>
+    <string name="on_foot">On foot</string>
+    <string name="running">Running</string>
+    <string name="still">Still</string>
+    <string name="tilting">Tilting</string>
+    <string name="unknown">Unknown activity</string>
+    <string name="walking">Walking</string>
+    <string name="unidentifiable_activity">Unidentifiable activity: %1$d</string>
+
     <string name="action_location_found">GPS</string>
+    <string name="action_activity_found">Activity found</string>
     <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdb</string>
     <string name="config.geodatabase.name">boNew</string>
     <string name="config.local.basemap">SanFrancisco.tpk</string>

@@ -3,6 +3,13 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="de.hsbo.veki.trackingapp.MainActivity">
 
+    <item android:id="@+id/action_activity_found"
+        android:icon="@drawable/questionmark"
+        android:alpha="0.5"
+        android:visible="false"
+        android:title="@string/action_activity_found"
+        app:showAsAction="ifRoom|collapseActionView" />
+
     <item android:id="@+id/action_location_found"
         android:icon="@drawable/gps_on_highres"
         android:alpha="0.5"
