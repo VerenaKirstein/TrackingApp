@@ -113,7 +113,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     protected static String featureLayerURL;
 
 
-
     protected static String featureServiceURL;
     private FeatureLayer featureLayer;
     protected static GraphicsLayer mLocationLayer;
@@ -127,7 +126,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private TextView mBewGeschw;
     private TextView mLongitudeText;
     private int GPS_INTERVAL = 10000;
-    private int GPS_FASTEST_INTERVAL = GPS_INTERVAL/2;
+    private int GPS_FASTEST_INTERVAL = GPS_INTERVAL / 2;
     private LocationRequest mLocationRequest;
     private String mLastUpdateTime;
     private Point mLocation;
@@ -296,8 +295,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mMapView.getLayer(2).setVisible(false);
 
 
-
-
         // Add Listener
         mMapView.setOnSingleTapListener(new
 
@@ -337,7 +334,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                                                                 }
 
 
-
                                                             } else {
                                                                 if (callout != null && callout.isShowing()) {
                                                                     callout.hide();
@@ -368,7 +364,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                                                 });
 
 
-
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -387,12 +382,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 }
 
 
-
             }
         });
 
     }
-
 
 
     /*
@@ -424,9 +417,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         String dateText = df2.format(date);
         return dateText;
     }
-
-
-
 
 
     private void checkGPS() {
@@ -467,11 +457,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 Constants.DETECTION_INTERVAL_IN_MILLISECONDS,
                 getActivityDetectionPendingIntent()
         ).setResultCallback(this);
-        Log.i(TAG,"REquets");
+        Log.i(TAG, "REquets");
     }
 
     public void removeActivityUpdates() {
-        if(menu.getItem(0)!=null && menu.getItem(0).isVisible())
+        if (menu.getItem(0) != null && menu.getItem(0).isVisible())
             menu.getItem(0).setVisible(false);
 
         if (!mGoogleApiClient.isConnected()) {
@@ -485,7 +475,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 getActivityDetectionPendingIntent()
         ).setResultCallback(this);
 
-        Log.i(TAG,"RemoveActivityUpdates");
+        Log.i(TAG, "RemoveActivityUpdates");
     }
 
     private PendingIntent getActivityDetectionPendingIntent() {
@@ -521,7 +511,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
-        this.menu=menu;
+        this.menu = menu;
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_main, menu);
 
@@ -637,63 +627,71 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             default:
                 return super.onOptionsItemSelected(item);
 
+
         }
 
 
     }
 
 
-
-public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
+    public boolean setIconActivity(ArrayList<DetectedActivity> detectedActivities) {
 
         menu.getItem(0).setVisible(true);
 
-    int confidenceLevel =0;
-    int number=0;
-    for(int i =0 ;i<detectedActivities.size();i++){
+        int confidenceLevel = 0;
+        int number = 0;
+        for (int i = 0; i < detectedActivities.size(); i++) {
 
-        int confidence = detectedActivities.get(i).getConfidence();
+            int confidence = detectedActivities.get(i).getConfidence();
 
-        if(confidenceLevel<confidence){
-            confidenceLevel = confidence;
-             number = i;
-            Log.i(TAG,"Number "+ number + " conf " +confidenceLevel);
+            if (confidenceLevel < confidence) {
+                confidenceLevel = confidence;
+                number = i;
+                Log.i(TAG, "Number " + i + " conf " + confidenceLevel);
+            }
+
         }
-
-    }
-    Log.i(TAG, "detected act " +detectedActivities.get(number).getType());
+        String[] string = detectedActivities.get(number).toString().split("type=");
+        String[] string2 = string[1].split(",");
+        Log.i(TAG, "detected act " + string2[0]);
+        Log.i(TAG, Constants.getActivityString(this, number));
         switch (detectedActivities.get(number).getType()) {
 
             case 1:
                 menu.getItem(0).setIcon(R.drawable.bike);
+                return true;
 
             case 0:
                 menu.getItem(0).setIcon(R.drawable.car);
+                return true;
 
             case 2:
                 menu.getItem(0).setIcon(R.drawable.walking);
+                return true;
 
             case 8:
                 menu.getItem(0).setIcon(R.drawable.running);
+                return true;
 
             case 3:
                 menu.getItem(0).setIcon(R.drawable.still);
-                Log.i(TAG,"Hallo");
+                return true;
 
             case 5:
                 menu.getItem(0).setIcon(R.drawable.tilting);
+                return true;
 
             case 4:
                 menu.getItem(0).setIcon(R.drawable.questionmark);
+                return true;
 
-            case 7:
-                menu.getItem(0).setIcon(R.drawable.walking);
-
+            default:
+                return true;
 
 
         }
 
-}
+    }
 
     public void onConnected(Bundle bundle) {
 
@@ -701,16 +699,14 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-       // createLocationRequest();
-        if(menu.getItem(1).isChecked()){
-            if(useGooglePlayService){
+        // createLocationRequest();
+        if (menu.getItem(1).isChecked()) {
+            if (useGooglePlayService) {
                 startLocationUpdates();
-            }
-            else{
+            } else {
                 startSimpleLocationUpdates();
             }
-        }
-        else {
+        } else {
             stopLocationUpdates();
         }
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
@@ -775,6 +771,7 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
             }
         }
     }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -782,6 +779,13 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
         // object broadcast sent by the intent service.
         LocalBroadcastManager.getInstance(this).registerReceiver(mBroadcastReceiver,
                 new IntentFilter(Constants.BROADCAST_ACTION));
+    }
+
+    @Override
+    protected void onPause() {
+        // Unregister the broadcast receiver that was registered during onResume().
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
+        super.onPause();
     }
 
     @Override
@@ -804,25 +808,24 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
 
         Point wgsPoint = new Point(locX, locY);
 
-        if(mLocation!= null){
-             oldLoc = mLocation;
+        if (mLocation != null) {
+            oldLoc = mLocation;
         }
 
         mLocation = (Point) GeometryEngine.project(wgsPoint,
                 SpatialReference.create(4326),
                 mMapView.getSpatialReference());
 
-        if(mLocation!=null) {
+        if (mLocation != null) {
             updateGraphic(mLocation);
         }
-        if(oldLoc.isEmpty()==false){
+        if (oldLoc.isEmpty() == false) {
             double distance = Math.sqrt(Math.pow(oldLoc.getX() - mLocation.getX(), 2) + Math.pow(oldLoc.getY() - mLocation.getY(), 2));
-            double geschw = distance / (GPS_INTERVAL/1000);
-            geschw = Math.round(geschw*100)/100.0;
+            double geschw = distance / (GPS_INTERVAL / 1000);
+            geschw = Math.round(geschw * 100) / 100.0;
             mBewGeschw.setText(valueOf(geschw + " m/s"));
-        }
-        else{
-            mBewGeschw.setText(valueOf(0.0+ " m/s"));
+        } else {
+            mBewGeschw.setText(valueOf(0.0 + " m/s"));
         }
 
         mLatitudeText.setText(valueOf(location.getLatitude()));
@@ -838,7 +841,7 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
 
         DateFormat datef = new SimpleDateFormat("dd.MM.yyyy");
         String date = datef.format(Calendar.getInstance().getTime());
-        mLastUpdateTime=date;
+        mLastUpdateTime = date;
 
         attributes.put("Date", date);
         Toast.makeText(this, "Updated: " + mLastUpdateTime, Toast.LENGTH_SHORT).show();
@@ -857,8 +860,8 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
 
         Graphic resultLocGraphic = new Graphic(nLocation, resultSymbolact);
         // add graphic to location layer
-        try{
-            mLocationLayer.updateGraphic(mLocationLayer.getGraphicIDs()[mLocationLayer.getNumberOfGraphics()-1],resultLocGraphic);
+        try {
+            mLocationLayer.updateGraphic(mLocationLayer.getGraphicIDs()[mLocationLayer.getNumberOfGraphics() - 1], resultLocGraphic);
         } catch (NullPointerException e) {
             e.getStackTrace();
         }
@@ -912,8 +915,7 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
     @Override
     public void onResult(@NonNull Result result) {
         if (result.getStatus().isSuccess()) {
-        }
-        else {
+        } else {
             Log.e(TAG, "Error adding or removing activity detection: " + result.getStatus().getStatusMessage());
         }
     }
@@ -964,7 +966,7 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
                     // convert feature to graphic
                     Graphic graphic = new Graphic(feature.getGeometry(), sms, feature.getAttributes());
                     // merge extent with point
-                    extent.merge((Point)graphic.getGeometry());
+                    extent.merge((Point) graphic.getGeometry());
                     // add it to the layer
                     mLocationLayer.addGraphic(graphic);
                 }
@@ -994,6 +996,7 @@ public void setIconActivity(ArrayList<DetectedActivity> detectedActivities){
         public void onReceive(Context context, Intent intent) {
             ArrayList<DetectedActivity> updatedActivities =
                     intent.getParcelableArrayListExtra(Constants.ACTIVITY_EXTRA);
+            Log.i(TAG, Constants.getActivityString(context, 0));
             setIconActivity(updatedActivities);
 
         }
