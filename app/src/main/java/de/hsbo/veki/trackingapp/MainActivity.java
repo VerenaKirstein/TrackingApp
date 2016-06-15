@@ -12,6 +12,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationManager;
+import android.nfc.Tag;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
@@ -56,19 +57,13 @@ import com.esri.core.symbol.SimpleMarkerSymbol;
 import com.esri.core.tasks.geodatabase.GeodatabaseSyncTask;
 import com.esri.core.tasks.query.QueryParameters;
 import com.esri.core.tasks.query.QueryTask;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.Result;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.ActivityRecognition;
-import com.google.android.gms.location.ActivityRecognitionResult;
 import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResult;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -82,7 +77,7 @@ import java.util.Map;
 
 import static java.lang.String.*;
 
-public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener, ResultCallback {
+public class MainActivity extends AppCompatActivity implements LocationListener, ResultCallback {
 
 
     // Attributes for Android usage
@@ -121,22 +116,16 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
 
     // Attributes for GPS-Logging
-    private GoogleApiClient mGoogleApiClient;
     private TextView mLatitudeText;
     private TextView mBewGeschw;
     private TextView mLongitudeText;
-    private int GPS_INTERVAL = 10000;
-    private int GPS_FASTEST_INTERVAL = GPS_INTERVAL / 2;
     private LocationRequest mLocationRequest;
     private String mLastUpdateTime;
     private Point mLocation;
-    private boolean mGPSActive = false;
-    private boolean useGooglePlayService = true;
-    private LocationManager locationManager;
-    private android.location.LocationListener locationListener;
-    private Location mLastLocation;
     protected ActivityDetectionBroadcastReceiver mBroadcastReceiver;
     private ArrayList<DetectedActivity> mDetectedActivities;
+    private GPSLocationUpdates updates;
+    private boolean updated = false;
 
 
     // Attributes for UI
@@ -163,6 +152,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         // Set Context
         MainActivity.setContext(this);
 
+
         // Load TextViews
         mLatitudeText = (TextView) findViewById(R.id.GPSLatText);
         mLongitudeText = (TextView) findViewById(R.id.GPSLonText);
@@ -170,14 +160,21 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         // Load Button
         button = (Button) findViewById(R.id.button);
+
         mBroadcastReceiver = new ActivityDetectionBroadcastReceiver();
         mDetectedActivities = new ArrayList<DetectedActivity>();
         // Set the confidence level of each monitored activity to zero.
         for (int i = 0; i < Constants.MONITORED_ACTIVITIES.length; i++) {
             mDetectedActivities.add(new DetectedActivity(Constants.MONITORED_ACTIVITIES[i], 0));
         }
+
+
+        if (updated == false) {
+            updates = new GPSLocationUpdates();
+            updated = true;
+        }
         checkGPS();
-        createGoogleApiClient();
+
 
         // Read Username from Device
         sharedpreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -418,7 +415,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         return dateText;
     }
 
-
+    /**
+     * check whether the settings allow GPS functionality
+     */
     private void checkGPS() {
 
         LocationManager service = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -426,8 +425,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 .isProviderEnabled(LocationManager.GPS_PROVIDER);
 
         // check if enabled and if not send user to the GSP settings
-        // Better solution would be to display a dialog and suggesting to
-        // go to the settings
         if (!enabled) {
             Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
             startActivity(intent);
@@ -435,47 +432,39 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     }
 
-    protected synchronized void createGoogleApiClient() {
-        if (mGoogleApiClient == null) {
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this)
-                    .addApi(LocationServices.API).addApi(ActivityRecognition.API)
-                    .build();
-            createLocationRequest();
-        }
-    }
-
+    /**
+     * request Detected Activities Updates
+     */
     public void requestActivityUpdates() {
-        if (!mGoogleApiClient.isConnected()) {
+        if (!updates.mGoogleApiClient.isConnected()) {
             Toast.makeText(this, "Not connected",
                     Toast.LENGTH_SHORT).show();
             return;
         }
         ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(
-                mGoogleApiClient,
+                updates.mGoogleApiClient,
                 Constants.DETECTION_INTERVAL_IN_MILLISECONDS,
                 getActivityDetectionPendingIntent()
         ).setResultCallback(this);
-        Log.i(TAG, "REquets");
     }
 
+    /**
+     * stop requesting the activity and remove the activity updates for the PendingIntent
+     */
     public void removeActivityUpdates() {
         if (menu.getItem(0) != null && menu.getItem(0).isVisible())
             menu.getItem(0).setVisible(false);
 
-        if (!mGoogleApiClient.isConnected()) {
+        if (!updates.mGoogleApiClient.isConnected()) {
             Toast.makeText(this, "Not Connected", Toast.LENGTH_SHORT).show();
             return;
         }
         // Remove all activity updates for the PendingIntent that was used to request activity
         // updates.
         ActivityRecognition.ActivityRecognitionApi.removeActivityUpdates(
-                mGoogleApiClient,
+                updates.mGoogleApiClient,
                 getActivityDetectionPendingIntent()
         ).setResultCallback(this);
-
-        Log.i(TAG, "RemoveActivityUpdates");
     }
 
     private PendingIntent getActivityDetectionPendingIntent() {
@@ -487,27 +476,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
 
-    protected void createLocationRequest() {
-        mLocationRequest = LocationRequest.create();
-        mLocationRequest.setInterval(GPS_INTERVAL);
-        mLocationRequest.setFastestInterval(GPS_FASTEST_INTERVAL);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
-                .addLocationRequest(mLocationRequest);
-        PendingResult<LocationSettingsResult> result =
-                LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient,
-                        builder.build());
-    }
-
-
     /*private void updateUI() {
         mLatitudeText.setText(String.valueOf(mLastLocation.getLatitude()));
         mLongitudeText.setText(String.valueOf(mLastLocation.getLongitude()));
         mBewGeschw.setText(String.valueOf(mLastLocation.getSpeed()));
 
     }*/
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -515,10 +489,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_main, menu);
 
-        carCheckbox = menu.getItem(2).getSubMenu().getItem(0);
-        pedestrianCheckbox = menu.getItem(2).getSubMenu().getItem(1);
-        bicycleCheckbox = menu.getItem(2).getSubMenu().getItem(2);
-        autoCheckbox = menu.getItem(2).getSubMenu().getItem(3);
+        carCheckbox = menu.getItem(3).getSubMenu().getItem(0);
+        pedestrianCheckbox = menu.getItem(3).getSubMenu().getItem(1);
+        bicycleCheckbox = menu.getItem(3).getSubMenu().getItem(2);
+        autoCheckbox = menu.getItem(3).getSubMenu().getItem(3);
 
         String getVehicle = sharedpreferences.getString("vehicle", "");
 
@@ -555,17 +529,30 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         editor.commit();
     }
 
+    /**
+     * if the activity is started connect the GoogleApiClient
+     */
     protected void onStart() {
         super.onStart();
-        mGoogleApiClient.connect();
+        Log.i(TAG, "Started");
+        if (updates.mGoogleApiClient != null) {
+            updates.mGoogleApiClient.connect();
+            Log.i(TAG, "Connected");
+        }
     }
 
+    /**
+     * if the activity is stopped disconnect the GoogleApiClient
+     */
     protected void onStop() {
         super.onStop();
-        if (mGoogleApiClient.isConnected()) {
-            mGoogleApiClient.disconnect();
+        Log.i(TAG, "Stopped");
+        if (updates.mGoogleApiClient != null) {
+            if (updates.mGoogleApiClient.isConnected()) {
+                updates.mGoogleApiClient.disconnect();
+            }
+            removeActivityUpdates();
         }
-        removeActivityUpdates();
     }
 
     @Override
@@ -577,18 +564,38 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 Intent username_intent = new Intent(this, ChangeUsernameActivity.class);
                 startActivity(username_intent);
                 return true;
+            case R.id.action_interval:
+                if (updates.mGPSActive == true) {
+                    stopLocationUpdates();
+                }
+                Intent interval_intent = new Intent(getApplicationContext(), ChangeGpsUpdateInterval.class);
+                startActivityForResult(interval_intent,100);
+                return true;
 
             case R.id.action_location_found:
-                if (!item.isChecked()) {
-                    controlGPS();
-                    item.setChecked(true);
-                    item.setIcon(R.drawable.gps_on_highres);
-                    item.getIcon();
-                    Toast.makeText(getApplicationContext(), "Start Tracking", Toast.LENGTH_SHORT).show();
+                if (item.isChecked()) {
+                    if (updates.mGoogleApiClient == null) {
+                        Log.i(TAG, "GoogleApiClient == null Create ApiClient");
+                        updates.changeLocationRequestInterval(10000);
+                        updates.mGoogleApiClient.connect();
+                        if(updates.mGoogleApiClient.isConnected())
+                            controlGPS();
+                    }else {
+                        controlGPS();
+                    }
+                    if(updates.mGPSActive==true) {
+                        item.setChecked(false);
+                        item.setIcon(R.drawable.gps_on_highres);
+                        Toast.makeText(getApplicationContext(), "Start Tracking", Toast.LENGTH_SHORT).show();
+                        if(autoCheckbox.isChecked()){
+                            requestActivityUpdates();
+                        }
+                    }
                     return true;
                 } else {
                     controlGPS();
-                    item.setChecked(false);
+                    removeActivityUpdates();
+                    item.setChecked(true);
                     item.setIcon(R.drawable.gps_off_highres);
                     Toast.makeText(getApplicationContext(), "Stop Tracking", Toast.LENGTH_SHORT).show();
                     return true;
@@ -599,14 +606,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 setVehicle("Auto");
                 removeActivityUpdates();
                 carCheckbox.setChecked(true);
-                mLocationRequest.setInterval(2000);
                 Log.e("carMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.pedestrianMenuItem:
                 setVehicle("Fußgänger");
                 removeActivityUpdates();
-                mLocationRequest.setInterval(10000);
                 pedestrianCheckbox.setChecked(true);
                 Log.e("pedestMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
@@ -634,12 +639,19 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
 
+    /**
+     * set the correct Item depending on the activity detected
+     *
+     * @param detectedActivities
+     * @return
+     */
     public boolean setIconActivity(ArrayList<DetectedActivity> detectedActivities) {
 
         menu.getItem(0).setVisible(true);
 
         int confidenceLevel = 0;
         int number = 0;
+        // find the most suitable DetectedActivity to display the correct Item
         for (int i = 0; i < detectedActivities.size(); i++) {
 
             int confidence = detectedActivities.get(i).getConfidence();
@@ -651,10 +663,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             }
 
         }
-        String[] string = detectedActivities.get(number).toString().split("type=");
-        String[] string2 = string[1].split(",");
-        Log.i(TAG, "detected act " + string2[0]);
-        Log.i(TAG, Constants.getActivityString(this, number));
+
         switch (detectedActivities.get(number).getType()) {
 
             case 1:
@@ -686,6 +695,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 return true;
 
             default:
+                menu.getItem(0).setIcon(R.drawable.questionmark);
                 return true;
 
 
@@ -693,81 +703,53 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     }
 
-    public void onConnected(Bundle bundle) {
-
-
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        // createLocationRequest();
-        if (menu.getItem(1).isChecked()) {
-            if (useGooglePlayService) {
-                startLocationUpdates();
-            } else {
-                startSimpleLocationUpdates();
-            }
-        } else {
-            stopLocationUpdates();
-        }
-        mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
-                mGoogleApiClient);
-    }
-
-
-    private void startSimpleLocationUpdates() {
-        // Register the listener with the Location Manager to receive location updates
-        if (Build.VERSION.SDK_INT >= 23 &&
-                ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        // Register the listener with the Location Manager to receive location updates
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0.5f, locationListener);
-        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0.5f, locationListener);
-
-    }
-
-    private void stopSimpleLocationUpdates() {
-
-        if (Build.VERSION.SDK_INT >= 23 &&
-                ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        // Remove the listener you previously added
-        locationManager.removeUpdates(locationListener);
-    }
-
+    /**
+     * stop Location updates for GoogleApiClient
+     */
     protected void stopLocationUpdates() {
-        if (mGoogleApiClient.isConnected()) {
+        if (updates.mGoogleApiClient.isConnected()) {
 
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-            mGPSActive = false;
+            LocationServices.FusedLocationApi.removeLocationUpdates(updates.mGoogleApiClient, this);
+            updates.mGPSActive = false;
         }
     }
 
+    /**
+     * start Location updates for GoogleApiClient
+     */
     private void startLocationUpdates() {
-        if (mGoogleApiClient.isConnected()) {
+        if (updates.mGoogleApiClient.isConnected()) {
+            Log.i(TAG,"start Location on connect");
             if (Build.VERSION.SDK_INT >= 23 &&
                     ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-            mGPSActive = true;
+            LocationServices.FusedLocationApi.requestLocationUpdates(updates.mGoogleApiClient, updates.mLocationRequest, this);
+            updates.mGPSActive = true;
 
         }
+        else{
+            updates.mGPSActive=false;
+        }
+
     }
 
+    /**
+     * defines how the location updates shall be received
+     */
     public void controlGPS() {
-        if (useGooglePlayService) {
-            if (mGPSActive == true) {
+        if (updates.useGooglePlayService) {
+            if (updates.mGPSActive == true) {
                 stopLocationUpdates();
             } else {
+                Log.i(TAG, "StartLocationUpdates");
                 startLocationUpdates();
             }
         } else {
-            if (mGPSActive == true) {
-                stopSimpleLocationUpdates();
+            if (updates.mGPSActive == true) {
+                updates.stopSimpleLocationUpdates();
             } else {
-                startSimpleLocationUpdates();
+                updates.startSimpleLocationUpdates();
             }
         }
     }
@@ -776,7 +758,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     protected void onResume() {
         super.onResume();
         // Register the broadcast receiver that informs this activity of the DetectedActivity
-        // object broadcast sent by the intent service.
         LocalBroadcastManager.getInstance(this).registerReceiver(mBroadcastReceiver,
                 new IntentFilter(Constants.BROADCAST_ACTION));
     }
@@ -787,16 +768,21 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
         super.onPause();
     }
-
     @Override
-    public void onConnectionSuspended(int i) {
-        Log.i(TAG, "Connection Suspended");
-        mGoogleApiClient.connect();
-    }
+    protected void onActivityResult(int requestCode,
+                                    int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(resultCode == 100){
 
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-        Log.i(TAG, "Connection failed. Error: " + connectionResult.getErrorCode());
+            // Storing result in a variable called myvar
+            // get("website") 'website' is the key value result data
+            Log.i(TAG,"Result");
+            int gpsInterval =data.getExtras().getInt("connected");
+            updates.changeLocationRequestInterval(gpsInterval);
+            controlGPS();
+
+        }
+
     }
 
     @Override
@@ -821,7 +807,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         }
         if (oldLoc.isEmpty() == false) {
             double distance = Math.sqrt(Math.pow(oldLoc.getX() - mLocation.getX(), 2) + Math.pow(oldLoc.getY() - mLocation.getY(), 2));
-            double geschw = distance / (GPS_INTERVAL / 1000);
+            double geschw = distance / (60);
             geschw = Math.round(geschw * 100) / 100.0;
             mBewGeschw.setText(valueOf(geschw + " m/s"));
         } else {
@@ -831,7 +817,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mLatitudeText.setText(valueOf(location.getLatitude()));
         mLongitudeText.setText(valueOf(location.getLongitude()));
 
-        mLastLocation = location;
+        updates.mLastLocation = location;
 
         //make a map of attributes
         Map<String, Object> attributes = new HashMap<String, Object>();
@@ -989,6 +975,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         });
     }
 
+    /**
+     * BroadCast Receiver for the IntentService to receive the DetectedActivity
+     */
     public class ActivityDetectionBroadcastReceiver extends BroadcastReceiver {
         protected static final String TAG = "activity-det-resp-rec";
 
@@ -996,7 +985,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         public void onReceive(Context context, Intent intent) {
             ArrayList<DetectedActivity> updatedActivities =
                     intent.getParcelableArrayListExtra(Constants.ACTIVITY_EXTRA);
-            Log.i(TAG, Constants.getActivityString(context, 0));
             setIconActivity(updatedActivities);
 
         }

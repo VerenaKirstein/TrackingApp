@@ -11,7 +11,7 @@
         app:showAsAction="ifRoom|collapseActionView" />
 
     <item android:id="@+id/action_location_found"
-        android:icon="@drawable/gps_on_highres"
+        android:icon="@drawable/gps_off_highres"
         android:alpha="0.5"
         android:title="@string/action_location_found"
         android:checked="true"
@@ -21,6 +21,11 @@
         android:id="@+id/action_username"
         android:orderInCategory="100"
         android:title="@string/action_username"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_interval"
+        android:title="@string/action_interval"
         app:showAsAction="never" />
 
     <item

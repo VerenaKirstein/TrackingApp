@@ -2,22 +2,13 @@
 
     <string name="app_name">TrackingApp</string>
     <string name="action_username">Benutzer ändern</string>
+    <string name="action_interval">GPS Intervall ändern</string>
     <string name="change_username">Benutzernamen ändern</string>
     <string name="vehicle">Vehrkersmittel ändern</string>
     <string name="car">Auto</string>
     <string name="pedestrian">Fußgänger</string>
     <string name="bicycle">Fahrrad</string>
     <string name="automatic">Automatisch erkennen</string>
-
-    <string name="in_vehicle">In a vehicle</string>
-    <string name="on_bicycle">On a bicycle</string>
-    <string name="on_foot">On foot</string>
-    <string name="running">Running</string>
-    <string name="still">Still</string>
-    <string name="tilting">Tilting</string>
-    <string name="unknown">Unknown activity</string>
-    <string name="walking">Walking</string>
-    <string name="unidentifiable_activity">Unidentifiable activity: %1$d</string>
 
     <string name="action_location_found">GPS</string>
     <string name="action_activity_found">Activity found</string>
