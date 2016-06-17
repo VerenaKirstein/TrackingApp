@@ -171,6 +171,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
 
         if (updated == false) {
             updates = new GPSLocationUpdates();
+            updates.createGoogleApiClient(1000);
             updated = true;
         }
         checkGPS();
@@ -436,16 +437,18 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
      * request Detected Activities Updates
      */
     public void requestActivityUpdates() {
-        if (!updates.mGoogleApiClient.isConnected()) {
-            Toast.makeText(this, "Not connected",
-                    Toast.LENGTH_SHORT).show();
-            return;
+        if(updates.mGoogleApiClient!=null) {
+            if (!updates.mGoogleApiClient.isConnected()) {
+                Toast.makeText(this, "Not connected",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(
+                    updates.mGoogleApiClient,
+                    Constants.DETECTION_INTERVAL_IN_MILLISECONDS,
+                    getActivityDetectionPendingIntent()
+            ).setResultCallback(this);
         }
-        ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(
-                updates.mGoogleApiClient,
-                Constants.DETECTION_INTERVAL_IN_MILLISECONDS,
-                getActivityDetectionPendingIntent()
-        ).setResultCallback(this);
     }
 
     /**
@@ -454,17 +457,18 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
     public void removeActivityUpdates() {
         if (menu.getItem(0) != null && menu.getItem(0).isVisible())
             menu.getItem(0).setVisible(false);
-
-        if (!updates.mGoogleApiClient.isConnected()) {
-            Toast.makeText(this, "Not Connected", Toast.LENGTH_SHORT).show();
-            return;
+        if(updates.mGoogleApiClient!=null) {
+            if (!updates.mGoogleApiClient.isConnected()) {
+                Toast.makeText(this, "Not Connected", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            // Remove all activity updates for the PendingIntent that was used to request activity
+            // updates.
+            ActivityRecognition.ActivityRecognitionApi.removeActivityUpdates(
+                    updates.mGoogleApiClient,
+                    getActivityDetectionPendingIntent()
+            ).setResultCallback(this);
         }
-        // Remove all activity updates for the PendingIntent that was used to request activity
-        // updates.
-        ActivityRecognition.ActivityRecognitionApi.removeActivityUpdates(
-                updates.mGoogleApiClient,
-                getActivityDetectionPendingIntent()
-        ).setResultCallback(this);
     }
 
     private PendingIntent getActivityDetectionPendingIntent() {
@@ -535,9 +539,11 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
     protected void onStart() {
         super.onStart();
         Log.i(TAG, "Started");
-        if (updates.mGoogleApiClient != null) {
-            updates.mGoogleApiClient.connect();
-            Log.i(TAG, "Connected");
+        if(updates.mGoogleApiClient!=null) {
+            if (!updates.mGoogleApiClient.isConnected()) {
+                updates.mGoogleApiClient.connect();
+                Log.i(TAG, "Connected");
+            }
         }
     }
 
@@ -575,9 +581,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
             case R.id.action_location_found:
                 if (item.isChecked()) {
                     if (updates.mGoogleApiClient == null) {
-                        Log.i(TAG, "GoogleApiClient == null Create ApiClient");
                         updates.changeLocationRequestInterval(10000);
-                        updates.mGoogleApiClient.connect();
                         if(updates.mGoogleApiClient.isConnected())
                             controlGPS();
                     }else {

@@ -78,6 +78,8 @@ public class GPSLocationUpdates implements GoogleApiClient.ConnectionCallbacks, 
             PendingResult<LocationSettingsResult> result =
                     LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient,
                             builder.build());
+
+            mGoogleApiClient.connect();
         }
     }
 
