@@ -13,14 +13,16 @@
     <string name="action_location_found">GPS</string>
     <string name="action_activity_found">Activity found</string>
     <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdb</string>
-    <string name="config.geodatabase.name">boNew2</string>
+    <string name="config.geodatabase.name">bo</string>
     <string name="config.local.basemap">SanFrancisco.tpk</string>
 
-    <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/NewPositionTrackLayer/FeatureServer/0</string>
-    <string name="FeatureServiceURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/NewPositionTrackLayer/FeatureServer</string>
+    <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingAppLayer/FeatureServer/0</string>
+    <string name="FeatureServiceURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingAppLayer/FeatureServer</string>
 
-    <string name="FeatureLayerURLalt">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/PositionTracker/FeatureServer/0</string>
-    <string name="FeatureServiceURLalt">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/PositionTracker/FeatureServer</string>
+    <string name="GPSLatHint">Longitude</string>
+    <string name="GPSLonHint">Latitude</string>
+    <string name="SpeedHint">Speed</string>
+    <string name="ButtonSyncHint">Sync!</string>
 
 
     <string name="sex_default">Männlich</string>

@@ -3,10 +3,8 @@ package de.hsbo.veki.trackingapp;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
+import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -14,11 +12,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.Toast;
-
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
 
 public class ChangeUsernameActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
 
@@ -43,11 +36,16 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
     private String profession_item = null;
     private Integer user_id_item = null;
 
+    private Intent main_activity_intent;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_change_username_layout);
+
+        main_activity_intent = new Intent();
+
 
         btn_save = (Button) findViewById(R.id.btn_save_username);
         btn_abort = (Button) findViewById(R.id.btn_abort_username);
@@ -82,7 +80,6 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
                 spinner_sex_item = (String) spinner_sex.getSelectedItem();
 
 
-
                 if (!username_item.isEmpty() && !age_item.isEmpty() && !profession_item.isEmpty()) {
 
 
@@ -95,20 +92,16 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
                         editor.clear();
 
                         editor.putString(USERNAME, username_item);
-                        editor.putString(AGE, age_item.toString());
                         editor.putString(PROFESSION, profession_item);
                         editor.putString(SEX, spinner_sex_item);
                         editor.putString(USER_ID, user_id_item.toString());
 
-                        editor.commit();
-
-                        Toast.makeText(getApplicationContext(),
-                                "Benutzername: " + username_item + " gesetzt!", Toast.LENGTH_LONG).show();
+                        editor.apply();
 
                         // Back to MainActivity
-                        Intent main_activity_intent = new Intent(ChangeUsernameActivity.this, MainActivity.class);
-                        main_activity_intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                        startActivity(main_activity_intent);
+                        main_activity_intent.putExtra("state", "Benutzername: " + username_item + " gesetzt!");
+                        setResult(250, main_activity_intent);
+                        finish();
 
                     } else {
                         Toast.makeText(getApplicationContext(),
@@ -118,6 +111,7 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
 
 
                 } else {
+
                     Toast.makeText(getApplicationContext(),
                             "Eingaben unvollständig!", Toast.LENGTH_LONG).show();
                 }
@@ -132,13 +126,10 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
             @Override
             public void onClick(View arg0) {
 
-                Toast.makeText(getApplicationContext(),
-                        "Änderung abgebrochen", Toast.LENGTH_LONG).show();
 
-                // Back to MainActivity
-                Intent main_activity_intent = new Intent(ChangeUsernameActivity.this, MainActivity.class);
-                main_activity_intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                startActivity(main_activity_intent);
+                main_activity_intent.putExtra("state", "Änderung abgebrochen");
+                setResult(250, main_activity_intent);
+                finish();
 
             }
         });

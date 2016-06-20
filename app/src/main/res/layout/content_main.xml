@@ -25,7 +25,7 @@
             android:id="@+id/GPSLonText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:hint="GPSLon"
+            android:hint="@string/GPSLonHint"
             android:height="40dp" />
 
         <TextView
@@ -33,7 +33,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginLeft="20dp"
-            android:hint="GPSLat"
+            android:hint="@string/GPSLatHint"
             android:height="40dp" />
 
         <TextView
@@ -41,13 +41,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginLeft="20dp"
-            android:hint="Geschw"
+            android:hint="@string/SpeedHint"
             android:height="40dp" />
 
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Sync"
+            android:text="@string/ButtonSyncHint"
             android:id="@+id/syncButton" />
 
 
@@ -62,7 +62,7 @@
             android:id="@+id/map"
             android:layout_width="fill_parent"
             android:layout_height="fill_parent"
-            mapoptions.MapType="OSM"
+            mapoptions.MapType="Streets"
             mapoptions.center="51.447776, 7.271262"
             mapoptions.ZoomLevel="12">
         </com.esri.android.map.MapView>

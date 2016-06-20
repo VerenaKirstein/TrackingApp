@@ -25,9 +25,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Map;
 
-/**
- * Created by Thorsten Kelm on 08.06.2016.
- */
+
 public class LocalGeodatabase {
 
     private static String filePath;
@@ -44,16 +42,18 @@ public class LocalGeodatabase {
     private FeatureLayer offlineFeatureLayer;
     private static Callout callout;
     private static MainActivity mainActivity;
+    private static MapView map;
 
 
     public MainActivity getMainActivity() {
         return mainActivity;
     }
 
-    public LocalGeodatabase(String filePath, String featureServiceUrl, MainActivity mainActivity) throws FileNotFoundException {
+    public LocalGeodatabase(String filePath, String featureServiceUrl, MainActivity mainActivity, MapView map) throws FileNotFoundException {
         this.filePath = filePath;
         this.featureServiceUrl = featureServiceUrl;
         this.mainActivity = mainActivity;
+        this.map = map;
 
         // Check for Filegeodatabase
         File f = new File(filePath);
@@ -61,12 +61,14 @@ public class LocalGeodatabase {
         gdbSyncTask = new GeodatabaseSyncTask(featureServiceUrl, null);
 
         // Create filegeodatabase if no exists
-        if (f.exists() == false) {
+        if (!f.exists()) {
 
             Log.e("File", ""+f.exists()+ " "+ featureServiceUrl);
 
             //MainActivity.progressDialog.setTitle("Create local runtime geodatabase");
-            createFilegeodatabase(featureServiceUrl);
+            createFilegeodatabase();
+
+
         }
 
         geodatabase = new Geodatabase(filePath);
@@ -82,13 +84,17 @@ public class LocalGeodatabase {
         return offlineFeatureLayer;
     }
 
-    private void createFilegeodatabase(String featureServiceUrl) {
+    private synchronized void createFilegeodatabase() {
+
         Log.i("createFilegeodatabase", "Create GeoDatabase");
         // create a dialog to update user on progress
+
         MainActivity.progressDialog.setTitle("Create local geodatabase");
         MainActivity.progressDialog.show();
+
         // create the GeodatabaseTask
 
+        Log.i("gdbSyncTask", gdbSyncTask.toString());
         gdbSyncTask.fetchFeatureServiceInfo(new CallbackListener<FeatureServiceInfo>() {
 
             @Override
@@ -100,6 +106,8 @@ public class LocalGeodatabase {
             public void onCallback(FeatureServiceInfo fsInfo) {
                 if (fsInfo.isSyncEnabled()) {
                     Log.i(MainActivity.TAG, "IS Sync Enabled, create Geodatabase");
+                    Log.i(MainActivity.TAG, fsInfo.toString());
+
                     createGeodatabase(fsInfo);
                 }
             }
@@ -168,16 +176,14 @@ public class LocalGeodatabase {
     }
 
 
-    /**
-     * Create Filegeodatabase
-     *
-     * @param featureServerInfo
-     */
-    private static void createGeodatabase(FeatureServiceInfo featureServerInfo) {
+    private static synchronized void createGeodatabase(FeatureServiceInfo featureServerInfo) {
         // set up the parameters to generate a geodatabase
         GenerateGeodatabaseParameters params = new GenerateGeodatabaseParameters(
-                featureServerInfo, MainActivity.mapView.getExtent(),
-                MainActivity.mapView.getSpatialReference());
+                featureServerInfo, map.getExtent(),
+                map.getSpatialReference());
+
+        Log.i(MainActivity.TAG, params.toString());
+
 
         // a callback which fires when the task has completed or failed.
         CallbackListener<String> gdbResponseCallback = new CallbackListener<String>() {
@@ -203,9 +209,11 @@ public class LocalGeodatabase {
             @Override
             public void statusUpdated(final GeodatabaseStatusInfo status) {
                 // get current status
+
+                Log.e("status", status.toString());
                 String progress = status.getStatus().toString();
                 // get activity context
-                Context context = MainActivity.getContext();
+                Context context = mainActivity.getApplicationContext();
                 // create activity from context
                 MainActivity activity = (MainActivity) context;
                 // update progress bar on main thread
@@ -225,20 +233,15 @@ public class LocalGeodatabase {
     /**
      * Request database, poll server to get status, and download the file
      */
-    private static void submitTask(GenerateGeodatabaseParameters params,
-                                   String file, GeodatabaseStatusCallback statusCallback,
-                                   CallbackListener<String> gdbResponseCallback) {
+    private static synchronized void submitTask(GenerateGeodatabaseParameters params,
+                                                String file, GeodatabaseStatusCallback statusCallback,
+                                                CallbackListener<String> gdbResponseCallback) {
         // submit task
         gdbSyncTask.generateGeodatabase(params, file, false, statusCallback,
                 gdbResponseCallback);
     }
 
 
-    /**
-     * Add feature layer from local geodatabase to map
-     *
-     * @param featureLayerPath
-     */
     private static void updateFeatureLayer(String featureLayerPath) {
         // create a new geodatabase
         com.esri.core.geodatabase.Geodatabase localGdb = null;
@@ -263,12 +266,6 @@ public class LocalGeodatabase {
     }
 
 
-
-    /**
-     * Show progressbar for creating Filegeodatabase
-     *  @param activity
-     * @param message
-     */
     protected static void showProgressBar(final MainActivity activity, final String message) {
         activity.runOnUiThread(new Runnable() {
 
