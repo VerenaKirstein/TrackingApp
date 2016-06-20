@@ -16,8 +16,8 @@
     <string name="config.geodatabase.name">bo</string>
     <string name="config.local.basemap">SanFrancisco.tpk</string>
 
-    <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingAppLayer/FeatureServer/0</string>
-    <string name="FeatureServiceURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingAppLayer/FeatureServer</string>
+    <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingApp/FeatureServer/0</string>
+    <string name="FeatureServiceURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingApp/FeatureServer</string>
 
     <string name="GPSLatHint">Longitude</string>
     <string name="GPSLonHint">Latitude</string>

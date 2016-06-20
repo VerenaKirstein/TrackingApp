@@ -12,7 +12,6 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
@@ -38,18 +37,15 @@ import com.esri.android.map.event.OnSingleTapListener;
 import com.esri.core.geodatabase.Geodatabase;
 import com.esri.core.geodatabase.GeodatabaseFeatureServiceTable;
 import com.esri.core.geodatabase.GeodatabaseFeatureTable;
-import com.esri.core.geometry.Envelope;
 import com.esri.core.geometry.GeometryEngine;
 import com.esri.core.geometry.Point;
 import com.esri.core.geometry.SpatialReference;
 import com.esri.core.map.Feature;
-import com.esri.core.map.FeatureResult;
 import com.esri.core.map.Graphic;
 import com.esri.core.symbol.SimpleMarkerSymbol;
 import com.esri.core.table.TableException;
 import com.esri.core.tasks.geodatabase.GeodatabaseSyncTask;
 import com.esri.core.tasks.query.QueryParameters;
-import com.esri.core.tasks.query.QueryTask;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationRequest;
 
@@ -277,7 +273,7 @@ public class MainActivity extends AppCompatActivity {
                 Context context = getApplicationContext();
                 Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
                 try {
-                    localGeodatabase.syncGeodatabase();
+                    localGeodatabase.syncGeodatabase(user_id);
 
                     // Remove and add offlineLayer
                     //graphicsLayer.removeAll();
@@ -547,18 +543,23 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
-        long size = localGeodatabase.getGeodatabaseFeatureTable().getNumberOfFeatures();
+        try {
+            long size = localGeodatabase.getGeodatabaseFeatureTable().getNumberOfFeatures();
 
-        Log.e("Number Features", "" + size);
+            Log.e("Number Features", "" + size);
 
-        for (long k = 0; k <= size; k++) {
-            try {
-                Log.e("Feature", "" + localGeodatabase.getGeodatabaseFeatureTable().getFeature(k));
-            } catch (TableException e) {
-                e.printStackTrace();
+            for (long k = 0; k <= size; k++) {
+                try {
+                    Log.e("Feature", "" + localGeodatabase.getGeodatabaseFeatureTable().getFeature(k));
+                } catch (TableException e) {
+                    e.printStackTrace();
+                }
+
             }
-
+        } catch (NullPointerException e) {
+            e.getStackTrace();
         }
+
 
     }
 
@@ -621,63 +622,63 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
-        @Override
-        protected FeatureResult doInBackground(String... params) {
-
-            String whereClause = "UserID='" + params[0] + "'";
-
-            Log.e("Where", whereClause);
-
-            // Define a new query and set parameters
-            QueryParameters mParams = new QueryParameters();
-            mParams.setWhere(whereClause);
-            mParams.setReturnGeometry(true);
-
-            // Define the new instance of QueryTask
-            QueryTask queryTask = new QueryTask(featureLayerURL);
-            FeatureResult results;
-
-            try {
-                // run the querytask
-                results = queryTask.execute(mParams);
-                return results;
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(FeatureResult results) {
-
-            // Remove the result from previously run query task
-            graphicsLayer.removeAll();
-
-            // Define a new marker symbol for the result graphics
-            SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.BLUE, 10, SimpleMarkerSymbol.STYLE.CIRCLE);
-
-            // Envelope to focus on the map extent on the results
-            Envelope extent = new Envelope();
-
-            // iterate through results
-            for (Object element : results) {
-                // if object is feature cast to feature
-                if (element instanceof Feature) {
-                    Feature feature = (Feature) element;
-                    // convert feature to graphic
-                    Graphic graphic = new Graphic(feature.getGeometry(), sms, feature.getAttributes());
-                    // merge extent with point
-                    extent.merge((Point) graphic.getGeometry());
-                    // add it to the layer
-                    graphicsLayer.addGraphic(graphic);
-                }
-            }
-
-            // Set the map extent to the envelope containing the result graphics
-            mapView.setExtent(extent, 100);
-        }
-    }
+//    public static class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
+//        @Override
+//        protected FeatureResult doInBackground(String... params) {
+//
+//            String whereClause = "UserID='" + params[0] + "'";
+//
+//            Log.e("Where", whereClause);
+//
+//            // Define a new query and set parameters
+//            QueryParameters mParams = new QueryParameters();
+//            mParams.setWhere(whereClause);
+//            mParams.setReturnGeometry(true);
+//
+//            // Define the new instance of QueryTask
+//            QueryTask queryTask = new QueryTask(featureLayerURL);
+//            FeatureResult results;
+//
+//            try {
+//                // run the querytask
+//                results = queryTask.execute(mParams);
+//                return results;
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//            return null;
+//        }
+//
+//        @Override
+//        protected void onPostExecute(FeatureResult results) {
+//
+//            // Remove the result from previously run query task
+//            graphicsLayer.removeAll();
+//
+//            // Define a new marker symbol for the result graphics
+//            SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.BLUE, 10, SimpleMarkerSymbol.STYLE.CIRCLE);
+//
+//            // Envelope to focus on the map extent on the results
+//            Envelope extent = new Envelope();
+//
+//            // iterate through results
+//            for (Object element : results) {
+//                // if object is feature cast to feature
+//                if (element instanceof Feature) {
+//                    Feature feature = (Feature) element;
+//                    // convert feature to graphic
+//                    Graphic graphic = new Graphic(feature.getGeometry(), sms, feature.getAttributes());
+//                    // merge extent with point
+//                    extent.merge((Point) graphic.getGeometry());
+//                    // add it to the layer
+//                    graphicsLayer.addGraphic(graphic);
+//                }
+//            }
+//
+//            // Set the map extent to the envelope containing the result graphics
+//            mapView.setExtent(extent, 100);
+//        }
+//    }
 
     public void showToast(final String message) {
         // Show toast message on the main thread only; this function can be

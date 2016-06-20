@@ -89,7 +89,7 @@
         android:id="@+id/map"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
-        mapoptions.MapType="Streets"
+        mapoptions.MapType="OSM"
         mapoptions.center="51.447776, 7.271262"
         mapoptions.ZoomLevel="12"
         android:layout_below="@+id/linearLayout"></com.esri.android.map.MapView>

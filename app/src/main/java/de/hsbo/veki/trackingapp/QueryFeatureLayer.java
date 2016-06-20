@@ -45,7 +45,7 @@ public class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
             MainActivity.graphicsLayer.removeAll();
 
             // Define a new marker symbol for the result graphics
-            SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.GREEN, 10, SimpleMarkerSymbol.STYLE.CIRCLE);
+            SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.RED, 10, SimpleMarkerSymbol.STYLE.CIRCLE);
 
             // iterate through results
             for (Object element : results) {

@@ -1,7 +1,6 @@
 package de.hsbo.veki.trackingapp;
 
 import android.app.ProgressDialog;
-import android.content.Context;
 import android.util.Log;
 
 import com.esri.android.map.Callout;
@@ -142,7 +141,7 @@ public class LocalGeodatabase {
      *
      * @throws Exception
      */
-    public void syncGeodatabase() throws Exception {
+    public void syncGeodatabase(final String user_id) throws Exception {
 
         Log.i(MainActivity.TAG, "Sync geodatabase from " + this.filePath);
         SyncGeodatabaseParameters params = geodatabase.getSyncParameters();
@@ -163,15 +162,19 @@ public class LocalGeodatabase {
         GeodatabaseStatusCallback syncStatusCallback = new GeodatabaseStatusCallback() {
             @Override
             public void statusUpdated(GeodatabaseStatusInfo status) {
-                Log.i(MainActivity.TAG, status.getStatus().toString());
+                String sucessState = status.getStatus().toString();
+                Log.i(MainActivity.TAG, sucessState);
+
+                if (sucessState.equals("Completed")) {
+                    Log.i(MainActivity.TAG, status.getStatus().toString());
+                    new QueryFeatureLayer().execute(user_id);
+                }
 
             }
         };
 
         Log.e("PARARMS: ", params.toString());
         gdbSyncTask.syncGeodatabase(params, geodatabase, syncStatusCallback, callback);
-
-
 
     }
 
@@ -210,14 +213,15 @@ public class LocalGeodatabase {
             public void statusUpdated(final GeodatabaseStatusInfo status) {
                 // get current status
 
-                Log.e("status", status.toString());
+                Log.e("status", status.getStatus().toString());
                 String progress = status.getStatus().toString();
                 // get activity context
-                Context context = mainActivity.getApplicationContext();
+                //Context context = mainActivity.getApplicationContext();
                 // create activity from context
-                MainActivity activity = (MainActivity) context;
+                //MainActivity activity = (MainActivity) context;
                 // update progress bar on main thread
                 showProgressBar(mainActivity, progress);
+
 
             }
         };
