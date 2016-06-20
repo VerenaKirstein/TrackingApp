@@ -25,11 +25,11 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResult;
-
 /**
  * Created by Thorsten Kelm on 19.06.2016.
  */
 public class BackgroundLocationService extends Service {
+
     //public GoogleApiClient mGoogleApiClient= null;
     public Location mLastLocation;
     ApiConnector connector;
@@ -37,31 +37,23 @@ public class BackgroundLocationService extends Service {
 
     public final IBinder binder = new LocalBinder();
 
-    public static final String BROADCAST_ACTION = "com.locationservicetest.BROADCAST";
-    public static final String EXTENDED_DATA_STATUS = "com.locationservicetest.STATUS";
+    public static final String BROADCAST_ACTION = "de.hsbo.veki.trackingapp.BROADCAST";
+    public static final String EXTENDED_DATA_STATUS = "de.hsbo.veki.trackingapp.STATUS";
 
 
     @Override
     public synchronized void onCreate() {
-        // super.onCreate();
 
-         handlerThread = new HandlerThread("Service", Process.THREAD_PRIORITY_BACKGROUND);
+        handlerThread = new HandlerThread("Service", Process.THREAD_PRIORITY_BACKGROUND);
         handlerThread.start();
 
         connector = new ApiConnector();
         connector.createGoogleApiClient();
     }
 
-    //     mGoogleApiClient.connect();
-
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-
-        // connector.startLocationUpdates();
-
-
-
         return START_STICKY;
     }
 
@@ -75,17 +67,7 @@ public class BackgroundLocationService extends Service {
         handlerThread.interrupt();
     }
 
-/*   @Override
-    public void onStart(Intent intent, int startId) {
-        // TODO Auto-generated method stub
-        super.onStart(intent, startId);
-        Log.d("TAG", "FirstService started");
 
-        Intent i = new Intent("android.intent.action.MAIN").putExtra("some_msg", "I will be sent!");
-        this.sendBroadcast(i);
-
-        this.stopSelf();
-    }*/
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -164,7 +146,7 @@ public class BackgroundLocationService extends Service {
                         LocationServices.SettingsApi.checkLocationSettings(MainActivity.client,
                                 builder.build());
 
-                Log.i("", MainActivity.client.toString());
+                Log.i("CLient", MainActivity.client.toString());
 
             } else if (!MainActivity.client.isConnected() && !MainActivity.client.isConnecting()) {
                 MainActivity.client.connect();

@@ -55,6 +55,8 @@ import com.google.android.gms.location.LocationRequest;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.text.DateFormat;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -70,6 +72,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences sharedpreferences;
     public static ProgressDialog progressDialog;
     private Toast toast;
+    private static Context context;
 
 
     // Attributes for LocalFilegeodatabase
@@ -116,12 +119,14 @@ public class MainActivity extends AppCompatActivity {
 
 
     // Attributes for BackgroundService
-    Intent intent;
-    GPSBroadcastReceiver gpsBroadcastReceiver;
-    BackgroundLocationService mService;
+    private Intent intent;
+    private GPSBroadcastReceiver gpsBroadcastReceiver;
+    private BackgroundLocationService mService;
     public static GoogleApiClient client;
     public static LocationRequest mLocationRequest;
-    Boolean mBound = false;
+    private Boolean mBound = false;
+    private Point newLocation;
+    private Point oldLocation = null;
 
     Button button_start;
     Button button_stop;
@@ -139,8 +144,7 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        //MainActivity.setContext(this);
-
+        MainActivity.setContext(this);
         progressDialog = new ProgressDialog(MainActivity.this);
 
         // Get resource names
@@ -175,11 +179,8 @@ public class MainActivity extends AppCompatActivity {
         mapView = (MapView) findViewById(R.id.map);
 
 
-        //ArcGISFeatureLayer aLayer = new ArcGISFeatureLayer(featureLayerURL, ArcGISFeatureLayer.MODE.ONDEMAND);
-        //mapView.addLayer(aLayer);
-
-        ConnectivityManager connMgr = (ConnectivityManager)
-                getSystemService(Context.CONNECTIVITY_SERVICE);
+        // Get NetworkInfo
+        ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
 
 
@@ -293,6 +294,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    public static void setContext(Context mainContext) {
+        MainActivity.context = mainContext;
+    }
+
+    public static Context getContext() {
+        return context;
+    }
+
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -359,7 +369,7 @@ public class MainActivity extends AppCompatActivity {
                     item.setChecked(false);
                     bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
                     startService(intent);
-                    //Log.i("start", "" + isMyServiceRunning(BackgroundLocationService.class));
+                    Log.i("start", "" + isMyServiceRunning(BackgroundLocationService.class));
                     item.setIcon(R.drawable.gps_on_highres);
                     return true;
 
@@ -369,8 +379,8 @@ public class MainActivity extends AppCompatActivity {
 
                         stopService(intent);
                         unbindService(mServerConn);
-                        LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(gpsBroadcastReceiver);
-                        //Log.i("stop", "" + isMyServiceRunning(BackgroundLocationService.class));
+                        LocalBroadcastManager.getInstance(context).unregisterReceiver(gpsBroadcastReceiver);
+                        Log.i("stop", "" + isMyServiceRunning(BackgroundLocationService.class));
                         item.setChecked(true);
                         item.setIcon(R.drawable.gps_off_highres);
 
@@ -466,8 +476,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    Point newLocation;
-    Point oldLocation = null;
+
 
     public void createPoint(double lon, double lat) {
 
@@ -487,13 +496,13 @@ public class MainActivity extends AppCompatActivity {
             double distance = Math.sqrt(Math.pow(oldLocation.getX() - newLocation.getX(), 2) + Math.pow(oldLocation.getY() - newLocation.getY(), 2));
             double geschw = distance / (60);
             geschw = Math.round(geschw * 100) / 100.0;
-            bewGeschw.setText(valueOf(geschw + " m/s"));
+            bewGeschw.setText(roundValue(geschw, 2) + " m/s");
         } else {
             bewGeschw.setText(valueOf(0.0 + " m/s"));
         }
 
-        latitudeText.setText(valueOf(lat));
-        longitudeText.setText(valueOf(lon));
+        latitudeText.setText(roundValue(lat, 7));
+        longitudeText.setText(roundValue(lon, 6));
 
         if (newLocation != null) {
             updateGraphic(newLocation);
@@ -504,6 +513,10 @@ public class MainActivity extends AppCompatActivity {
         addFeatureToLocalgeodatabase(newLocation);
 
 
+    }
+
+    public String roundValue(double value, int i) {
+        return String.valueOf(new BigDecimal(value).round(new MathContext(i)));
     }
 
 

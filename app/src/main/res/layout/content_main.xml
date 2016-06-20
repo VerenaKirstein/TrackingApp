@@ -19,55 +19,79 @@
         android:orientation="horizontal"
         android:layout_marginLeft="0dp"
         android:layout_marginRight="0dp"
-        android:id="@+id/linearLayout">
+        android:id="@+id/linearLayout"
+        android:layout_centerHorizontal="true"
+        android:background="#b7b7b7">
 
-        <TextView
-            android:id="@+id/GPSLonText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:hint="@string/GPSLonHint"
-            android:height="40dp" />
-
-        <TextView
-            android:id="@+id/GPSLatText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="20dp"
-            android:hint="@string/GPSLatHint"
-            android:height="40dp" />
-
-        <TextView
-            android:id="@+id/BwGeschw"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="20dp"
-            android:hint="@string/SpeedHint"
-            android:height="40dp" />
-
-        <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/ButtonSyncHint"
-            android:id="@+id/syncButton" />
-
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@+id/linearLayout">
-
-        <com.esri.android.map.MapView
-            android:id="@+id/map"
+        <LinearLayout
             android:layout_width="fill_parent"
             android:layout_height="fill_parent"
-            mapoptions.MapType="Streets"
-            mapoptions.center="51.447776, 7.271262"
-            mapoptions.ZoomLevel="12">
-        </com.esri.android.map.MapView>
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/GPSLonText"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+                android:hint="@string/GPSLonHint"
+                android:height="40dp"
+                android:textAlignment="center"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:layout_weight="1">
+
+            <TextView
+            android:id="@+id/GPSLatText"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+            android:layout_marginLeft="20dp"
+            android:hint="@string/GPSLatHint"
+                android:height="40dp"
+                android:gravity="center" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:layout_weight="1">
+
+            <TextView
+            android:id="@+id/BwGeschw"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+            android:layout_marginLeft="20dp"
+            android:hint="@string/SpeedHint"
+                android:height="40dp"
+                android:gravity="center" />
+        </LinearLayout>
+
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:layout_weight="1">
+
+            <Button
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+                android:text="@string/ButtonSyncHint"
+                android:id="@+id/syncButton" />
+        </LinearLayout>
+
 
     </LinearLayout>
 
+    <com.esri.android.map.MapView
+        android:id="@+id/map"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        mapoptions.MapType="Streets"
+        mapoptions.center="51.447776, 7.271262"
+        mapoptions.ZoomLevel="12"
+        android:layout_below="@+id/linearLayout"></com.esri.android.map.MapView>
 
 </RelativeLayout>
