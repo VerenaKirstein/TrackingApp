@@ -16,31 +16,63 @@
         android:id="@+id/textView_change_username"
         android:layout_alignParentTop="true"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true" />
+        android:layout_alignParentStart="true"
+        android:layout_margin="10dp"
+        android:textSize="25dp" />
 
     <EditText
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:inputType="textPersonName"
-        android:ems="10"
         android:id="@+id/editText_username"
         android:layout_below="@+id/textView_change_username"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
         android:layout_marginTop="32dp"
-        android:layout_alignRight="@+id/btn_abort_username"
-        android:layout_alignEnd="@+id/btn_abort_username"
-        android:hint="Benutzername" />
+        android:hint="Benutzername"
+        android:layout_margin="10dp"/>
+
+    <Spinner
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/spinner_sex"
+        android:spinnerMode="dropdown"
+        android:hint="Geschlecht"
+        android:layout_below="@+id/editText_username"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_margin="10dp"/>
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:id="@+id/editText_age"
+        android:hint="Alter"
+        android:layout_below="@+id/spinner_sex"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_margin="10dp"/>
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="text"
+        android:id="@+id/editText_profession"
+        android:hint="Beruf"
+        android:layout_below="@+id/editText_age"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_margin="10dp"/>
 
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Speichern"
         android:id="@+id/btn_save_username"
-        android:layout_below="@+id/editText_username"
+        android:layout_below="@+id/editText_profession"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:layout_marginTop="31dp" />
+        android:layout_alignParentStart="true" />
 
     <Button
         android:layout_width="wrap_content"
@@ -52,4 +84,8 @@
         android:layout_toEndOf="@+id/btn_save_username"
         android:layout_marginLeft="35dp"
         android:layout_marginStart="35dp" />
+
+
+
+
 </RelativeLayout>

@@ -22,6 +22,11 @@ android {
         exclude 'META-INF/LICENSE'
         exclude 'META-INF/NOTICE'
     }
+
+
+
+
+
 }
 
 dependencies {
@@ -32,4 +37,5 @@ dependencies {
     // Add ArcGIS Runtime SDK for Android dependency
     compile 'com.esri.arcgis.android:arcgis-android:10.2.8'
     compile 'com.google.android.gms:play-services-location:9.0.1'
+
 }

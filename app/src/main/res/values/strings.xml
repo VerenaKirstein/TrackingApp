@@ -13,10 +13,20 @@
     <string name="action_location_found">GPS</string>
     <string name="action_activity_found">Activity found</string>
     <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdb</string>
-    <string name="config.geodatabase.name">boNew</string>
+    <string name="config.geodatabase.name">boNew2</string>
     <string name="config.local.basemap">SanFrancisco.tpk</string>
 
-    <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/PositionTracker/FeatureServer/0</string>
-    <string name="FeatureServiceURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/PositionTracker/FeatureServer</string>
+    <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/NewPositionTrackLayer/FeatureServer/0</string>
+    <string name="FeatureServiceURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/NewPositionTrackLayer/FeatureServer</string>
 
+    <string name="FeatureLayerURLalt">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/PositionTracker/FeatureServer/0</string>
+    <string name="FeatureServiceURLalt">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/PositionTracker/FeatureServer</string>
+
+
+    <string name="sex_default">Männlich</string>
+
+    <string-array name="sex_array">
+        <item>Männlich</item>
+        <item>Weiblich</item>
+    </string-array>
 </resources>

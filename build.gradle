@@ -1,25 +1,46 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
+
 buildscript {
     repositories {
         jcenter()
     }
+
+
     dependencies {
         classpath 'com.android.tools.build:gradle:2.1.0'
+
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
     }
+
+
+
+
 }
+
+plugins {
+    id 'com.github.jk1.dependency-license-report' version '0.3.4'
+}
+
 
 allprojects {
     repositories {
         jcenter()
         maven {
+            url 'https://plugins.gradle.org/m2/'
+        }
+        maven {
             url 'https://esri.bintray.com/arcgis'
         }
+
+        apply plugin: 'com.github.jk1.dependency-license-report'
+
     }
 }
+
+
 
 task clean(type: Delete) {
     delete rootProject.buildDir

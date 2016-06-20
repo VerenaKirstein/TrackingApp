@@ -47,8 +47,9 @@
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Sync now!"
-            android:id="@+id/button" />
+            android:text="Sync"
+            android:id="@+id/syncButton" />
+
 
     </LinearLayout>
 

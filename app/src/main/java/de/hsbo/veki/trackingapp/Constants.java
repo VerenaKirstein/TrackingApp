@@ -16,6 +16,9 @@ public final class Constants {
     public static final String PACKAGE_NAME = "de.hsbo.veki.trackingapp.activityrecognition";
     public static final String BROADCAST_ACTION = PACKAGE_NAME + ".BROADCAST_ACTION";
     public static final String ACTIVITY_EXTRA = PACKAGE_NAME + ".ACTIVITY_EXTRA";
+    public static final String TAG = "SAMPLE_ANDROID_APP";
+    public static final String PREFS_NAME = "TRACKINGAPP";
+
 
     /**
      * The desired time between activity detections.
@@ -35,5 +38,7 @@ public final class Constants {
             DetectedActivity.TILTING,
             DetectedActivity.UNKNOWN
     };
+
+
 
 }

@@ -7,7 +7,6 @@ import android.util.Log;
 import com.esri.android.map.Callout;
 import com.esri.android.map.FeatureLayer;
 import com.esri.android.map.MapView;
-import com.esri.android.map.ags.ArcGISFeatureLayer;
 import com.esri.core.ags.FeatureServiceInfo;
 import com.esri.core.geodatabase.Geodatabase;
 import com.esri.core.geodatabase.GeodatabaseFeature;
@@ -29,13 +28,13 @@ import java.util.Map;
 /**
  * Created by Thorsten Kelm on 08.06.2016.
  */
-public class TrackGeodatabase {
+public class LocalGeodatabase {
 
-    private static MapView mMapView;
     private static String filePath;
     private String featureServiceUrl;
     private static GeodatabaseSyncTask gdbSyncTask;
     private Geodatabase geodatabase = null;
+    public static ProgressDialog mProgressDialog;
 
     public GeodatabaseFeatureTable getGeodatabaseFeatureTable() {
         return geodatabaseFeatureTable;
@@ -44,25 +43,29 @@ public class TrackGeodatabase {
     private GeodatabaseFeatureTable geodatabaseFeatureTable;
     private FeatureLayer offlineFeatureLayer;
     private static Callout callout;
-    public static ProgressDialog mProgressDialog;
-    private static Context mContext;
+    private static MainActivity mainActivity;
 
 
-    public TrackGeodatabase(String filePath, String featureServiceUrl, MapView mMapView) throws FileNotFoundException {
+    public MainActivity getMainActivity() {
+        return mainActivity;
+    }
+
+    public LocalGeodatabase(String filePath, String featureServiceUrl, MainActivity mainActivity) throws FileNotFoundException {
         this.filePath = filePath;
         this.featureServiceUrl = featureServiceUrl;
-        this.mMapView = mMapView;
+        this.mainActivity = mainActivity;
 
         // Check for Filegeodatabase
         File f = new File(filePath);
 
-        TrackGeodatabase.setContext(MainActivity.getContext());
+        gdbSyncTask = new GeodatabaseSyncTask(featureServiceUrl, null);
+
         // Create filegeodatabase if no exists
         if (f.exists() == false) {
 
-            mProgressDialog = new ProgressDialog(MainActivity.getContext());
-            mProgressDialog.setTitle("Create local runtime geodatabase");
+            Log.e("File", ""+f.exists()+ " "+ featureServiceUrl);
 
+            //MainActivity.progressDialog.setTitle("Create local runtime geodatabase");
             createFilegeodatabase(featureServiceUrl);
         }
 
@@ -72,7 +75,7 @@ public class TrackGeodatabase {
         //create a feature layer and add it to the map
         offlineFeatureLayer = new FeatureLayer(geodatabaseFeatureTable);
 
-        gdbSyncTask = new GeodatabaseSyncTask(featureServiceUrl, null);
+
     }
 
     public FeatureLayer getOfflineFeatureLayer() {
@@ -80,9 +83,10 @@ public class TrackGeodatabase {
     }
 
     private void createFilegeodatabase(String featureServiceUrl) {
-        Log.i(MainActivity.TAG, "Create GeoDatabase");
+        Log.i("createFilegeodatabase", "Create GeoDatabase");
         // create a dialog to update user on progress
-        MainActivity.mProgressDialog.show();
+        MainActivity.progressDialog.setTitle("Create local geodatabase");
+        MainActivity.progressDialog.show();
         // create the GeodatabaseTask
 
         gdbSyncTask.fetchFeatureServiceInfo(new CallbackListener<FeatureServiceInfo>() {
@@ -172,21 +176,21 @@ public class TrackGeodatabase {
     private static void createGeodatabase(FeatureServiceInfo featureServerInfo) {
         // set up the parameters to generate a geodatabase
         GenerateGeodatabaseParameters params = new GenerateGeodatabaseParameters(
-                featureServerInfo, mMapView.getExtent(),
-                mMapView.getSpatialReference());
+                featureServerInfo, MainActivity.mapView.getExtent(),
+                MainActivity.mapView.getSpatialReference());
 
         // a callback which fires when the task has completed or failed.
         CallbackListener<String> gdbResponseCallback = new CallbackListener<String>() {
             @Override
             public void onError(final Throwable e) {
-                Log.e(MainActivity.TAG, "Error creating geodatabase");
-                mProgressDialog.dismiss();
+                Log.e(MainActivity.TAG, "Error creating geodatabase" + e);
+                MainActivity.progressDialog.dismiss();
             }
 
             @Override
             public void onCallback(String path) {
                 Log.i(MainActivity.TAG, "Geodatabase is: " + path);
-                mProgressDialog.dismiss();
+                MainActivity.progressDialog.dismiss();
                 // update map with local feature layer from geodatabase
                 updateFeatureLayer(path);
                 // log the path to the data on device
@@ -205,7 +209,7 @@ public class TrackGeodatabase {
                 // create activity from context
                 MainActivity activity = (MainActivity) context;
                 // update progress bar on main thread
-                MainActivity.showProgressBar(activity, progress);
+                showProgressBar(mainActivity, progress);
 
             }
         };
@@ -251,20 +255,28 @@ public class TrackGeodatabase {
             for (GeodatabaseFeatureTable gdbFeatureTable : localGdb
                     .getGeodatabaseTables()) {
                 if (gdbFeatureTable.hasGeometry()) {
-                    mMapView.addLayer(new FeatureLayer(gdbFeatureTable));
+                    MainActivity.mapView.addLayer(new FeatureLayer(gdbFeatureTable));
 
                 }
             }
         }
     }
 
-    // methods to ensure context is available when updating the progress dialog
-    public static Context getContext() {
-        return mContext;
-    }
 
-    public static void setContext(Context context) {
-        mContext = context;
-    }
 
+    /**
+     * Show progressbar for creating Filegeodatabase
+     *  @param activity
+     * @param message
+     */
+    protected static void showProgressBar(final MainActivity activity, final String message) {
+        activity.runOnUiThread(new Runnable() {
+
+            @Override
+            public void run() {
+                MainActivity.progressDialog.setMessage(message);
+            }
+
+        });
+    }
 }
