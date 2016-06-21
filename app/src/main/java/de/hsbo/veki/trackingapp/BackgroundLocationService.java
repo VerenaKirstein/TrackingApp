@@ -1,6 +1,9 @@
 package de.hsbo.veki.trackingapp;
 
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -16,16 +19,22 @@ import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.Result;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.ActivityRecognition;
+import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResult;
+
+import java.util.ArrayList;
 
 /**
  * Created by Thorsten Kelm on 19.06.2016.
@@ -44,6 +53,7 @@ public class BackgroundLocationService extends Service {
     @Override
     public boolean onUnbind(Intent intent) {
         Log.i("Background","Unbind");
+        connector.removeActivityUpdates();
         return super.onUnbind(intent);
     }
     @Override
@@ -63,6 +73,7 @@ public class BackgroundLocationService extends Service {
         Log.i("Interval", " " +updateInterval);
         connector.changeLocationRequestInterval(updateInterval);
 
+
         return START_REDELIVER_INTENT;
     }
 
@@ -73,6 +84,7 @@ public class BackgroundLocationService extends Service {
         super.onDestroy();
         Log.i("TAG", "ON DESTROY");
         connector.stopLocationUpdates();
+        connector.removeActivityUpdates();
         handlerThread.interrupt();
     }
 
@@ -80,6 +92,9 @@ public class BackgroundLocationService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
+
+          //  connector.requestActivityUpdates();
+
         return binder;
     }
 
@@ -91,7 +106,7 @@ public class BackgroundLocationService extends Service {
         }
     }
 
-    public class ApiConnector implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+    public class ApiConnector implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener,ResultCallback {
 
         private LocationManager locationManager1;
         private android.location.LocationListener locationListener1;
@@ -113,13 +128,20 @@ public class BackgroundLocationService extends Service {
         @Override
         public void onConnected(@Nullable Bundle bundle) {
             startLocationUpdates();
+            requestActivityUpdates();
         }
 
         @Override
         public void onConnectionSuspended(int i) {
 
         }
+        private PendingIntent getActivityDetectionPendingIntent() {
+            Intent intent = new Intent(getBaseContext(), DetectedActivitiesIntentService.class);
 
+            // We use FLAG_UPDATE_CURRENT so that we get the same pending intent back when calling
+            // requestActivityUpdates() and removeActivityUpdates().
+            return PendingIntent.getService(getBaseContext(), 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        }
         @Override
         public void onLocationChanged(Location location) {
             mLastLocation = location;
@@ -133,6 +155,7 @@ public class BackgroundLocationService extends Service {
             }
 
         }
+
 
         @Override
         public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
@@ -219,7 +242,43 @@ public class BackgroundLocationService extends Service {
 
             }
         }
+        /**
+         * request Detected Activities Updates
+         */
+        public void requestActivityUpdates() {
+            if (MainActivity.client != null) {
+                if (!MainActivity.client.isConnected()) {
+                    Toast.makeText(MainActivity.getContext(), "Not connected",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(
+                        MainActivity.client,
+                        Constants.DETECTION_INTERVAL_IN_MILLISECONDS,
+                        getActivityDetectionPendingIntent()
+                ).setResultCallback(this);
+            }
+        }
 
+
+
+        /**
+         * stop requesting the activity and remove the activity updates for the PendingIntent
+         */
+        public void removeActivityUpdates() {
+            if (MainActivity.client != null) {
+                if (!MainActivity.client.isConnected()) {
+                    Toast.makeText(MainActivity.getContext(), "Not Connected", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                // Remove all activity updates for the PendingIntent that was used to request activity
+                // updates.
+                ActivityRecognition.ActivityRecognitionApi.removeActivityUpdates(
+                        MainActivity.client,
+                        getActivityDetectionPendingIntent()
+                ).setResultCallback(this);
+            }
+        }
         /**
          * stop Location updates for GoogleApiClient
          */
@@ -249,6 +308,11 @@ public class BackgroundLocationService extends Service {
             } else {
 
             }
+
+        }
+
+        @Override
+        public void onResult(@NonNull Result result) {
 
         }
     }

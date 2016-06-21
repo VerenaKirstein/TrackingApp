@@ -23,7 +23,7 @@ public final class Constants {
     /**
      * The desired time between activity detections.
      */
-    public static final long DETECTION_INTERVAL_IN_MILLISECONDS = 10000;
+    public static final long DETECTION_INTERVAL_IN_MILLISECONDS = 15000;
 
     /**
      * List of DetectedActivity types that are monitored

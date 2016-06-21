@@ -131,6 +131,8 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     private Boolean mBound = false;
     private Point newLocation;
     private Point oldLocation = null;
+    private ActivityDetectionBroadcastReceiver mBroadcastReceiver;
+    private ArrayList<DetectedActivity> mDetectedActivities;
 
     Button button_start;
     Button button_stop;
@@ -271,13 +273,21 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         IntentFilter intentFilter = new IntentFilter("android.intent.action.MAIN");
 
         gpsBroadcastReceiver = new GPSBroadcastReceiver();
+        mBroadcastReceiver = new ActivityDetectionBroadcastReceiver();
+        mDetectedActivities = new ArrayList<DetectedActivity>();
+        // Set the confidence level of each monitored activity to zero.
+        for (int i = 0; i < Constants.MONITORED_ACTIVITIES.length; i++) {
+            Log.i(TAG,"Set onfidence level");
+            mDetectedActivities.add(new DetectedActivity(Constants.MONITORED_ACTIVITIES[i], 0));
+        }
+
         //  LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
 
         if (isMyServiceRunning(BackgroundLocationService.class)) {
             bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
             LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
 
-
+        }
             syncButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -299,7 +309,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                 }
             });
 
-        }
+
 
     }
     public static void setContext(Context mainContext) {
@@ -325,6 +335,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
         if (isMyServiceRunning(BackgroundLocationService.class)) {
             menu.getItem(1).setChecked(false).setIcon(R.drawable.gps_on_highres);
+            menu.getItem(0).setVisible(true);
         }
 
         String getVehicle = sharedpreferences.getString("vehicle", "");
@@ -389,6 +400,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                     LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
                     item.setChecked(false);
                     bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
+                    menu.getItem(0).setVisible(true);
                     startService(intent);
                     Log.i("start", "" + isMyServiceRunning(BackgroundLocationService.class));
                     item.setIcon(R.drawable.gps_on_highres);
@@ -402,6 +414,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                         unbindService(mServerConn);
                         LocalBroadcastManager.getInstance(context).unregisterReceiver(gpsBroadcastReceiver);
                         Log.i("stop", "" + isMyServiceRunning(BackgroundLocationService.class));
+                        menu.getItem(0).setVisible(false);
                         item.setChecked(true);
                         item.setIcon(R.drawable.gps_off_highres);
 
@@ -432,28 +445,27 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
             case R.id.carMenuItem:
                 setVehicle("Auto");
-                removeActivityUpdates();
+                //removeActivityUpdates();
                 carCheckbox.setChecked(true);
                 Log.e("carMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.pedestrianMenuItem:
                 setVehicle("Fußgänger");
-                removeActivityUpdates();
+                //removeActivityUpdates();
                 pedestrianCheckbox.setChecked(true);
                 Log.e("pedestMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.bicycleMenuItem:
                 setVehicle("Fahrrad");
-                removeActivityUpdates();
+                //removeActivityUpdates();
                 bicycleCheckbox.setChecked(true);
                 Log.e("bicyMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.auto:
-                setVehicle("Automatisch erkennen");
-                requestActivityUpdates();
+                setVehicle(mDetectedActivities.get(0).toString());
                 autoCheckbox.setChecked(true);
                 return true;
 
@@ -488,7 +500,20 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             Log.e(TAG, "Error adding or removing activity detection: " + result.getStatus().getStatusMessage());
         }
     }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Register the broadcast receiver that informs this activity of the DetectedActivity
+        LocalBroadcastManager.getInstance(this).registerReceiver(mBroadcastReceiver,
+                new IntentFilter(Constants.BROADCAST_ACTION));
+    }
 
+    @Override
+    protected void onPause() {
+        // Unregister the broadcast receiver that was registered during onResume().
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
+        super.onPause();
+    }
     public class GPSBroadcastReceiver extends BroadcastReceiver {
 
 
@@ -523,7 +548,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
         if (oldLocation != null) {
             double distance = Math.sqrt(Math.pow(oldLocation.getX() - newLocation.getX(), 2) + Math.pow(oldLocation.getY() - newLocation.getY(), 2));
-            double geschw = distance / (60);
+            double geschw = distance / (3.6);
             geschw = Math.round(geschw * 100) / 100.0;
             bewGeschw.setText(roundValue(geschw, 2) + " m/s");
         } else {
@@ -771,7 +796,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
      */
     public boolean setIconActivity(ArrayList<DetectedActivity> detectedActivities) {
 
-        menu.getItem(0).setVisible(true);
+        //menu.getItem(0).setVisible(true);
 
         int confidenceLevel = 0;
         int number = 0;
@@ -842,14 +867,15 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         public void onReceive(Context context, Intent intent) {
             ArrayList<DetectedActivity> updatedActivities =
                     intent.getParcelableArrayListExtra(Constants.ACTIVITY_EXTRA);
+            Log.i(TAG,"Activity Received");
             setIconActivity(updatedActivities);
 
         }
     }
 
-    /**
+/*    *//**
      * request Detected Activities Updates
-     */
+     *//*
     public void requestActivityUpdates() {
         if (client != null) {
             if (!client.isConnected()) {
@@ -873,9 +899,9 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
-    /**
+    *//**
      * stop requesting the activity and remove the activity updates for the PendingIntent
-     */
+     *//*
     public void removeActivityUpdates() {
         if (menu.getItem(0) != null && menu.getItem(0).isVisible())
             menu.getItem(0).setVisible(false);
@@ -891,7 +917,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                     getActivityDetectionPendingIntent()
             ).setResultCallback(this);
         }
-    }
+    }*/
 
 }
 
