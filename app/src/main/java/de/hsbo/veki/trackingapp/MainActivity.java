@@ -1,6 +1,7 @@
 package de.hsbo.veki.trackingapp;
 
 import android.app.ActivityManager;
+import android.app.PendingIntent;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -15,6 +16,7 @@ import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
+import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -47,6 +49,10 @@ import com.esri.core.table.TableException;
 import com.esri.core.tasks.geodatabase.GeodatabaseSyncTask;
 import com.esri.core.tasks.query.QueryParameters;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.Result;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.location.ActivityRecognition;
+import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationRequest;
 
 import java.io.File;
@@ -54,6 +60,7 @@ import java.io.FileNotFoundException;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Hashtable;
@@ -61,7 +68,7 @@ import java.util.Map;
 
 import static java.lang.String.valueOf;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements ResultCallback {
 
     // Attributes for Application
     public static String TAG = "MainActivity";
@@ -112,6 +119,7 @@ public class MainActivity extends AppCompatActivity {
     private MenuItem pedestrianCheckbox = null;
     private MenuItem bicycleCheckbox = null;
     private MenuItem autoCheckbox = null;
+    public static Integer gpsInterval = 15000;
 
 
     // Attributes for BackgroundService
@@ -263,33 +271,37 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter intentFilter = new IntentFilter("android.intent.action.MAIN");
 
         gpsBroadcastReceiver = new GPSBroadcastReceiver();
-        LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
+        //  LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
+
+        if (isMyServiceRunning(BackgroundLocationService.class)) {
+            bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
+            LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
 
 
-        syncButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
+            syncButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
 
-                Context context = getApplicationContext();
-                Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
-                try {
-                    localGeodatabase.syncGeodatabase(user_id);
+                    Context context = getApplicationContext();
+                    Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
+                    try {
+                        localGeodatabase.syncGeodatabase(user_id);
 
-                    // Remove and add offlineLayer
-                    //graphicsLayer.removeAll();
-                    //new QueryFeatureLayer().execute(user_id);
+                        // Remove and add offlineLayer
+                        //graphicsLayer.removeAll();
+                        //new QueryFeatureLayer().execute(user_id);
 
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+
                 }
+            });
 
-
-            }
-        });
+        }
 
     }
-
-
     public static void setContext(Context mainContext) {
         MainActivity.context = mainContext;
     }
@@ -308,8 +320,12 @@ public class MainActivity extends AppCompatActivity {
 
         pedestrianCheckbox = menu.getItem(3).getSubMenu().getItem(1);
         bicycleCheckbox = menu.getItem(3).getSubMenu().getItem(2);
-        autoCheckbox = menu.getItem(3).getSubMenu().getItem(0);
-        carCheckbox = menu.getItem(3).getSubMenu().getItem(3);
+        autoCheckbox = menu.getItem(3).getSubMenu().getItem(3);
+        carCheckbox = menu.getItem(3).getSubMenu().getItem(0);
+
+        if (isMyServiceRunning(BackgroundLocationService.class)) {
+            menu.getItem(1).setChecked(false).setIcon(R.drawable.gps_on_highres);
+        }
 
         String getVehicle = sharedpreferences.getString("vehicle", "");
 
@@ -343,6 +359,12 @@ public class MainActivity extends AppCompatActivity {
 
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unbindService(mServerConn);
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
 
         switch (item.getItemId()) {
@@ -352,16 +374,19 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(username_intent);
                 return true;
             case R.id.action_interval:
-//                if (updates.mGPSActive == true) {
-//                    stopLocationUpdates();
-//                }
-//                Intent interval_intent = new Intent(getApplicationContext(), ChangeGpsUpdateInterval.class);
-//                startActivityForResult(interval_intent,100);
+                if (mBound) {
+                    stopService(intent);
+                    unbindService(mServerConn);
+                    LocalBroadcastManager.getInstance(this).unregisterReceiver(gpsBroadcastReceiver);
+                    mBound = false;
+                }
+                Intent interval_intent = new Intent(getApplicationContext(), ChangeGpsUpdateInterval.class);
+                startActivityForResult(interval_intent, 100);
                 return true;
 
             case R.id.action_location_found:
                 if (item.isChecked()) {
-
+                    LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
                     item.setChecked(false);
                     bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
                     startService(intent);
@@ -407,28 +432,28 @@ public class MainActivity extends AppCompatActivity {
 
             case R.id.carMenuItem:
                 setVehicle("Auto");
-                //removeActivityUpdates();
+                removeActivityUpdates();
                 carCheckbox.setChecked(true);
                 Log.e("carMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.pedestrianMenuItem:
                 setVehicle("Fußgänger");
-                //removeActivityUpdates();
+                removeActivityUpdates();
                 pedestrianCheckbox.setChecked(true);
                 Log.e("pedestMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.bicycleMenuItem:
                 setVehicle("Fahrrad");
-                //removeActivityUpdates();
+                removeActivityUpdates();
                 bicycleCheckbox.setChecked(true);
                 Log.e("bicyMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.auto:
                 setVehicle("Automatisch erkennen");
-                //requestActivityUpdates();
+                requestActivityUpdates();
                 autoCheckbox.setChecked(true);
                 return true;
 
@@ -455,6 +480,14 @@ public class MainActivity extends AppCompatActivity {
             Log.d("TAG", "onServiceDisconnected");
         }
     };
+
+    @Override
+    public void onResult(@NonNull Result result) {
+        if (result.getStatus().isSuccess()) {
+        } else {
+            Log.e(TAG, "Error adding or removing activity detection: " + result.getStatus().getStatusMessage());
+        }
+    }
 
     public class GPSBroadcastReceiver extends BroadcastReceiver {
 
@@ -621,6 +654,35 @@ public class MainActivity extends AppCompatActivity {
         return sb.toString();
     }
 
+    @Override
+    protected void onActivityResult(int requestCode,
+                                    int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == 100) {
+
+            // Storing result in a variable called myvar
+            // get("website") 'website' is the key value result data
+            Log.i(TAG, "Result");
+            gpsInterval = data.getExtras().getInt("connected");
+            intent.putExtra("Update_Interval", gpsInterval);
+
+            if (!menu.getItem(1).isChecked()) {
+                LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
+                bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
+                startService(intent);
+            }
+            //changeLocationRequestInterval(gpsInterval);
+            //controlGPS();
+
+        }
+        else if (resultCode == 250) {
+
+            String state = data.getExtras().getString("state");
+            Log.e("state", state);
+            Toast.makeText(getApplicationContext(), state, Toast.LENGTH_LONG).show();
+        }
+
+    }
 
 //    public static class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
 //        @Override
@@ -701,33 +763,134 @@ public class MainActivity extends AppCompatActivity {
         return view;
     }
 
+    /**
+     * set the correct Item depending on the activity detected
+     *
+     * @param detectedActivities
+     * @return
+     */
+    public boolean setIconActivity(ArrayList<DetectedActivity> detectedActivities) {
+
+        menu.getItem(0).setVisible(true);
+
+        int confidenceLevel = 0;
+        int number = 0;
+        // find the most suitable DetectedActivity to display the correct Item
+        for (int i = 0; i < detectedActivities.size(); i++) {
+
+            int confidence = detectedActivities.get(i).getConfidence();
+
+            if (confidenceLevel < confidence) {
+                confidenceLevel = confidence;
+                number = i;
+                Log.i(TAG, "Number " + i + " conf " + confidenceLevel);
+            }
+
+        }
+
+        switch (detectedActivities.get(number).getType()) {
+
+            case 1:
+                menu.getItem(0).setIcon(R.drawable.bike);
+                return true;
+
+            case 0:
+                menu.getItem(0).setIcon(R.drawable.car);
+                return true;
+
+            case 2:
+                menu.getItem(0).setIcon(R.drawable.walking);
+                return true;
+
+            case 8:
+                menu.getItem(0).setIcon(R.drawable.running);
+                return true;
+
+            case 3:
+                menu.getItem(0).setIcon(R.drawable.still);
+                return true;
+
+            case 5:
+                menu.getItem(0).setIcon(R.drawable.tilting);
+                return true;
+
+            case 4:
+                menu.getItem(0).setIcon(R.drawable.questionmark);
+                return true;
+
+            default:
+                menu.getItem(0).setIcon(R.drawable.questionmark);
+                return true;
+
+
+        }
+
+    }
 
     public MainActivity getMainActivity() {
         return this;
     }
 
+    /**
+     * BroadCast Receiver for the IntentService to receive the DetectedActivity
+     */
+    public class ActivityDetectionBroadcastReceiver extends BroadcastReceiver {
+        protected static final String TAG = "activity-det-resp-rec";
 
-    @Override
-    protected void onActivityResult(int requestCode,
-                                    int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == 100) {
 
-            // Storing result in a variable called myvar
-            // get("website") 'website' is the key value result data
-            //Log.i(TAG,"Result");
-            //int gpsInterval =data.getExtras().getInt("connected");
-            //updates.changeLocationRequestInterval(gpsInterval);
-            //controlGPS();
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            ArrayList<DetectedActivity> updatedActivities =
+                    intent.getParcelableArrayListExtra(Constants.ACTIVITY_EXTRA);
+            setIconActivity(updatedActivities);
 
-        } else if (resultCode == 250) {
-
-            String state = data.getExtras().getString("state");
-            Log.e("state", state);
-            Toast.makeText(getApplicationContext(), state, Toast.LENGTH_LONG).show();
         }
+    }
 
+    /**
+     * request Detected Activities Updates
+     */
+    public void requestActivityUpdates() {
+        if (client != null) {
+            if (!client.isConnected()) {
+                Toast.makeText(this, "Not connected",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(
+                    client,
+                    Constants.DETECTION_INTERVAL_IN_MILLISECONDS,
+                    getActivityDetectionPendingIntent()
+            ).setResultCallback(this);
+        }
+    }
 
+    private PendingIntent getActivityDetectionPendingIntent() {
+        Intent intent = new Intent(this, DetectedActivitiesIntentService.class);
+
+        // We use FLAG_UPDATE_CURRENT so that we get the same pending intent back when calling
+        // requestActivityUpdates() and removeActivityUpdates().
+        return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    /**
+     * stop requesting the activity and remove the activity updates for the PendingIntent
+     */
+    public void removeActivityUpdates() {
+        if (menu.getItem(0) != null && menu.getItem(0).isVisible())
+            menu.getItem(0).setVisible(false);
+        if (client != null) {
+            if (!client.isConnected()) {
+                Toast.makeText(this, "Not Connected", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            // Remove all activity updates for the PendingIntent that was used to request activity
+            // updates.
+            ActivityRecognition.ActivityRecognitionApi.removeActivityUpdates(
+                    client,
+                    getActivityDetectionPendingIntent()
+            ).setResultCallback(this);
+        }
     }
 
 }

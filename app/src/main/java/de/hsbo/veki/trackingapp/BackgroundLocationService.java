@@ -20,16 +20,17 @@ import android.util.Log;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.location.ActivityRecognition;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResult;
+
 /**
  * Created by Thorsten Kelm on 19.06.2016.
  */
 public class BackgroundLocationService extends Service {
-
     //public GoogleApiClient mGoogleApiClient= null;
     public Location mLastLocation;
     ApiConnector connector;
@@ -40,21 +41,29 @@ public class BackgroundLocationService extends Service {
     public static final String BROADCAST_ACTION = "de.hsbo.veki.trackingapp.BROADCAST";
     public static final String EXTENDED_DATA_STATUS = "de.hsbo.veki.trackingapp.STATUS";
 
-
+    @Override
+    public boolean onUnbind(Intent intent) {
+        Log.i("Background","Unbind");
+        return super.onUnbind(intent);
+    }
     @Override
     public synchronized void onCreate() {
 
         handlerThread = new HandlerThread("Service", Process.THREAD_PRIORITY_BACKGROUND);
         handlerThread.start();
 
-        connector = new ApiConnector();
-        connector.createGoogleApiClient();
+
     }
 
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        return START_STICKY;
+        int updateInterval = intent.getIntExtra("Update_Interval",15000);
+        connector = new ApiConnector();
+        Log.i("Interval", " " +updateInterval);
+        connector.changeLocationRequestInterval(updateInterval);
+
+        return START_REDELIVER_INTENT;
     }
 
     @Override
@@ -84,21 +93,21 @@ public class BackgroundLocationService extends Service {
 
     public class ApiConnector implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
-
+        private LocationManager locationManager1;
+        private android.location.LocationListener locationListener1;
         private LocationManager locationManager;
         private LocationListener locationListener;
 
-        private int GPS_INTERVAL = 3000;
 
         public ApiConnector() {
-            if (MainActivity.client == null) {
+          /*  if (MainActivity.client == null) {
                 MainActivity.client = new GoogleApiClient.Builder(getApplicationContext())
                         .addConnectionCallbacks(this)
                         .addOnConnectionFailedListener(this)
                         .addApi(LocationServices.API)
                         .build();
                 MainActivity.client.connect();
-            }
+            }*/
         }
 
         @Override
@@ -131,13 +140,24 @@ public class BackgroundLocationService extends Service {
         }
 
 
-        public synchronized void createGoogleApiClient() {
+        public synchronized void createGoogleApiClient(int interval) {
+            if (MainActivity.client == null) {
+                Log.i("Background","Create Google Api Client");
+                MainActivity.client = new GoogleApiClient.Builder(getApplicationContext())
+                        .addConnectionCallbacks(this)
+                        .addOnConnectionFailedListener(this)
+                        .addApi(LocationServices.API).addApi(ActivityRecognition.API)
+                        .build();
+               // MainActivity.client.connect();
+            }
+
+
             if (MainActivity.mLocationRequest == null) {
 
-
+                Log.i("Background","Create LocationRequest");
                 MainActivity.mLocationRequest = LocationRequest.create();
-                MainActivity.mLocationRequest.setInterval(GPS_INTERVAL);
-                MainActivity.mLocationRequest.setFastestInterval(GPS_INTERVAL / 2);
+                MainActivity.mLocationRequest.setInterval(interval);
+                MainActivity.mLocationRequest.setFastestInterval(interval / 2);
                 MainActivity.mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
                 LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
@@ -146,13 +166,59 @@ public class BackgroundLocationService extends Service {
                         LocationServices.SettingsApi.checkLocationSettings(MainActivity.client,
                                 builder.build());
 
-                Log.i("CLient", MainActivity.client.toString());
+                Log.i("", MainActivity.client.toString());
+                Log.i("Background","Connect");
+                MainActivity.client.connect();
 
             } else if (!MainActivity.client.isConnected() && !MainActivity.client.isConnecting()) {
+                Log.i("Background","Connect");
                 MainActivity.client.connect();
             }
         }
 
+        /**
+         * if no GooglePlayService is available the location is received by the locationManager
+         */
+        public void startSimpleLocationUpdates() {
+            if (Build.VERSION.SDK_INT >= 23 &&
+                    ContextCompat.checkSelfPermission(MainActivity.getContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return;
+            }
+            // Register the listener to receive location updates
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0.5f, locationListener1);
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0.5f, locationListener1);
+
+        }
+
+        /**
+         * stop receiving location updates
+         */
+        public void stopSimpleLocationUpdates() {
+
+            if (Build.VERSION.SDK_INT >= 23 &&
+                    ContextCompat.checkSelfPermission(MainActivity.getContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return;
+            }
+            locationManager.removeUpdates(locationListener1);
+        }
+
+        public synchronized void changeLocationRequestInterval(int interval) {
+            if (MainActivity.client != null) {
+                Log.i("Background","Google Api Client nicht null");
+                if (MainActivity.client.isConnected() || MainActivity.client.isConnecting()) {
+                    MainActivity.client.disconnect();
+                }
+                MainActivity.client = null;
+                MainActivity.mLocationRequest = null;
+                createGoogleApiClient(interval);
+
+
+            } else {
+                Log.i("Background","Create Google Api Client2");
+                createGoogleApiClient(interval);
+
+            }
+        }
 
         /**
          * stop Location updates for GoogleApiClient

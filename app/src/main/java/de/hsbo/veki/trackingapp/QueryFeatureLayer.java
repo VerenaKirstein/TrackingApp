@@ -2,6 +2,7 @@ package de.hsbo.veki.trackingapp;
 
 import android.graphics.Color;
 import android.os.AsyncTask;
+import android.util.Log;
 
 import com.esri.core.map.Feature;
 import com.esri.core.map.FeatureResult;
@@ -17,6 +18,7 @@ public class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
         @Override
         protected FeatureResult doInBackground(String... params) {
 
+            Log.e("UserCred", params[0]);
             String whereClause = "UserID='" + params[0] + "'";
 
             // Define a new query and set parameters
