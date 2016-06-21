@@ -1,16 +1,17 @@
 package de.hsbo.veki.trackingapp;
 
 import android.app.ActivityManager;
-import android.app.PendingIntent;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
@@ -18,6 +19,7 @@ import android.os.Environment;
 import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
@@ -51,7 +53,6 @@ import com.esri.core.tasks.query.QueryParameters;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.Result;
 import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.location.ActivityRecognition;
 import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationRequest;
 
@@ -95,7 +96,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     private String age;
     private String sex;
     private String profession;
-    private String user_id;
+    private String user_id = null;
 
 
     // Attributes for the Map
@@ -120,6 +121,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     private MenuItem bicycleCheckbox = null;
     private MenuItem autoCheckbox = null;
     public static Integer gpsInterval = 15000;
+    private Intent username_intent;
 
 
     // Attributes for BackgroundService
@@ -134,13 +136,6 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     private ActivityDetectionBroadcastReceiver mBroadcastReceiver;
     private ArrayList<DetectedActivity> mDetectedActivities;
 
-    Button button_start;
-    Button button_stop;
-
-    TextView lon;
-    TextView lat;
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -153,10 +148,12 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         MainActivity.setContext(this);
         progressDialog = new ProgressDialog(MainActivity.this);
 
+
         // Get resource names
         demoDataFile = Environment.getExternalStorageDirectory();
         offlineDataSDCardDirName = this.getResources().getString(R.string.config_data_sdcard_offline_dir);
         filename = this.getResources().getString(R.string.config_geodatabase_name);
+
 
         // Load UserInterface-Elements
         latitudeText = (TextView) findViewById(R.id.GPSLatText);
@@ -164,34 +161,31 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         bewGeschw = (TextView) findViewById(R.id.BwGeschw);
         syncButton = (Button) findViewById(R.id.syncButton);
 
-        //button_stop = (Button) findViewById(R.id.button_stop);
-        //button_start = (Button) findViewById(R.id.button_start);
 
         // Read Username from Device
         HashMap<String, String> userCredentials = getSharedpreferences(Constants.PREFS_NAME);
+        username = userCredentials.get("username");
 
-        if (userCredentials.isEmpty()) {
+        if (username.isEmpty()) {
             Toast.makeText(getApplicationContext(), "Bitte Benutzerdaten eingeben!", Toast.LENGTH_LONG).show();
         } else {
-            username = userCredentials.get("username");
             Toast.makeText(getApplicationContext(), "Eingeloggt als: " + username + ".", Toast.LENGTH_LONG).show();
         }
+
 
         // Get FeatureURL
         featureServiceURL = this.getResources().getString(R.string.FeatureServiceURL);
         featureLayerURL = this.getResources().getString(R.string.FeatureLayerURL);
 
+
         // Initialize Map
         mapView = (MapView) findViewById(R.id.map);
-
+        graphicsLayer = new GraphicsLayer();
+        mapView.addLayer(graphicsLayer);
 
         // Get NetworkInfo
         ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-
-
-        graphicsLayer = new GraphicsLayer();
-        mapView.addLayer(graphicsLayer);
 
 
         try {
@@ -201,18 +195,17 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                 localGeodatabase = new LocalGeodatabase(createGeodatabaseFilePath(), featureServiceURL, getMainActivity(), mapView);
                 offlineFeatureLayer = localGeodatabase.getOfflineFeatureLayer();
 
+
                 mapView.addLayer(offlineFeatureLayer);
-                mapView.getLayer(mapView.getLayers().length - 1).setVisible(false);
+                mapView.getLayer(2).setVisible(false);
 
                 Log.e("DB", offlineFeatureLayer.getFeatureTable().toString());
                 Log.e("DB", offlineFeatureLayer.getFeatureTable().getFields().toString());
-
-
                 Log.e("UserCred", userCredentials.toString());
                 // Create a personal FeatureLayer and add to map
                 user_id = userCredentials.get("user_id");
 
-
+                // Load FeatureLayer for user_id
                 new QueryFeatureLayer().execute(user_id);
 
             } else {
@@ -228,96 +221,95 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
 
         mapView.setOnSingleTapListener(new OnSingleTapListener() {
+
             @Override
             public void onSingleTap(float x, float y) {
 
-                long[] selectedFeatures = offlineFeatureLayer.getFeatureIDs(x, y, 25, 1);
+                if (!user_id.isEmpty()) {
 
-                if (selectedFeatures.length > 0) {
+                    long[] selectedFeatures = offlineFeatureLayer.getFeatureIDs(x, y, 25, 1);
 
-                    // Feature is selected
-                    offlineFeatureLayer.selectFeatures(selectedFeatures, false);
+                    if (selectedFeatures.length > 0) {
+
+                        // Feature is selected
+                        offlineFeatureLayer.selectFeatures(selectedFeatures, false);
 
 
-                    Feature feature = offlineFeatureLayer.getFeature(selectedFeatures[0]);
-                    String featureUser_ID = feature.getAttributeValue("UserID").toString();
-                    String featureUsername = feature.getAttributeValue("Username").toString();
-                    String featureVehicle = feature.getAttributeValue("Vehicle").toString();
-                    String featureTime = feature.getAttributeValue("Time").toString();
+                        Feature feature = offlineFeatureLayer.getFeature(selectedFeatures[0]);
+                        String featureUser_ID = feature.getAttributeValue("UserID").toString();
+                        String featureUsername = feature.getAttributeValue("Username").toString();
+                        String featureVehicle = feature.getAttributeValue("Vehicle").toString();
+                        String featureTime = feature.getAttributeValue("Time").toString();
 
-                    if (user_id.equals(featureUser_ID)) {
-                        callout = mapView.getCallout();
-                        callout.setStyle(R.xml.tracked_point);
-                        callout.setContent(loadView(featureUser_ID, featureUsername, featureVehicle, featureTime));
-                        callout.show((Point) feature.getGeometry());
+                        if (user_id.equals(featureUser_ID)) {
+                            callout = mapView.getCallout();
+                            callout.setStyle(R.xml.tracked_point);
+                            callout.setContent(loadView(featureUser_ID, featureUsername, featureVehicle, featureTime));
+                            callout.show((Point) feature.getGeometry());
+                        } else {
+                            if (callout != null && callout.isShowing()) {
+                                callout.hide();
+                            }
+                        }
+
                     } else {
                         if (callout != null && callout.isShowing()) {
                             callout.hide();
+
                         }
                     }
 
-                } else {
-                    if (callout != null && callout.isShowing()) {
-                        callout.hide();
-
-                    }
+                    offlineFeatureLayer.clearSelection();
                 }
-
-                offlineFeatureLayer.clearSelection();
             }
 
         });
 
 
+        // Initialize background service
         intent = new Intent(this, BackgroundLocationService.class);
         IntentFilter intentFilter = new IntentFilter("android.intent.action.MAIN");
+
+        // Initialize Userinput Inent
+        username_intent = new Intent(this, ChangeUsernameActivity.class);
 
         gpsBroadcastReceiver = new GPSBroadcastReceiver();
         mBroadcastReceiver = new ActivityDetectionBroadcastReceiver();
         mDetectedActivities = new ArrayList<DetectedActivity>();
+
         // Set the confidence level of each monitored activity to zero.
         for (int i = 0; i < Constants.MONITORED_ACTIVITIES.length; i++) {
-            Log.i(TAG,"Set onfidence level");
+
+            Log.i(TAG, "Set onfidence level");
             mDetectedActivities.add(new DetectedActivity(Constants.MONITORED_ACTIVITIES[i], 0));
         }
 
-        //  LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
-
         if (isMyServiceRunning(BackgroundLocationService.class)) {
+
             bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
             LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
 
         }
-            syncButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-
-                    Context context = getApplicationContext();
-                    Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
-                    try {
-                        localGeodatabase.syncGeodatabase(user_id);
-
-                        // Remove and add offlineLayer
-                        //graphicsLayer.removeAll();
-                        //new QueryFeatureLayer().execute(user_id);
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
 
 
+        syncButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+                Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
+                try {
+
+                    localGeodatabase.syncGeodatabase(user_id);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-            });
 
 
+            }
+        });
 
-    }
-    public static void setContext(Context mainContext) {
-        MainActivity.context = mainContext;
-    }
 
-    public static Context getContext() {
-        return context;
     }
 
 
@@ -350,13 +342,11 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             case "Automatisch erkennen":
                 autoCheckbox.setChecked(true);
             default:
-                pedestrianCheckbox.setChecked(true);
-                setVehicle("Fußgänger");
+                autoCheckbox.setChecked(true);
+                setVehicle("Automatisch erkennen");
 
         }
 
-        getVehicle = getSharedpreferences(Constants.PREFS_NAME).get("vehicle");
-        Toast.makeText(getApplicationContext(), "oncreate: " + getVehicle + " gesetzt", Toast.LENGTH_LONG).show();
         return true;
 
     }
@@ -374,6 +364,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         super.onDestroy();
         unbindService(mServerConn);
     }
+
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -396,70 +387,67 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                 return true;
 
             case R.id.action_location_found:
-                if (item.isChecked()) {
-                    LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
-                    item.setChecked(false);
-                    bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
-                    menu.getItem(0).setVisible(true);
-                    startService(intent);
-                    Log.i("start", "" + isMyServiceRunning(BackgroundLocationService.class));
-                    item.setIcon(R.drawable.gps_on_highres);
-                    return true;
 
-                } else {
+                user_id = sharedpreferences.getString("user_id", "");
 
-                    if (mBound) {
+                final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
-                        stopService(intent);
-                        unbindService(mServerConn);
-                        LocalBroadcastManager.getInstance(context).unregisterReceiver(gpsBroadcastReceiver);
-                        Log.i("stop", "" + isMyServiceRunning(BackgroundLocationService.class));
-                        menu.getItem(0).setVisible(false);
-                        item.setChecked(true);
-                        item.setIcon(R.drawable.gps_off_highres);
+                if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
 
-                        mBound = false;
+
+                    if (user_id.isEmpty()) {
+                        alertMessageNoUser();
+                    } else {
+                        if (item.isChecked()) {
+                            LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
+                            item.setChecked(false);
+                            bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
+                            menu.getItem(0).setVisible(true);
+                            startService(intent);
+                            Log.i("start", "" + isMyServiceRunning(BackgroundLocationService.class));
+                            item.setIcon(R.drawable.gps_on_highres);
+                            return true;
+
+                        } else {
+
+                            if (mBound) {
+
+                                stopService(intent);
+                                unbindService(mServerConn);
+                                LocalBroadcastManager.getInstance(context).unregisterReceiver(gpsBroadcastReceiver);
+                                Log.i("stop", "" + isMyServiceRunning(BackgroundLocationService.class));
+                                menu.getItem(0).setVisible(false);
+                                item.setChecked(true);
+                                item.setIcon(R.drawable.gps_off_highres);
+
+                                mBound = false;
+                            }
+                            return true;
+                        }
                     }
-                    return true;
+                } else {
+                    alertMessageNoGps();
                 }
 
 
-//                    if(updates.mGPSActive==true) {
-//                        item.setChecked(false);
-//                        item.setIcon(R.drawable.gps_on_highres);
-//                        Toast.makeText(getApplicationContext(), "Start Tracking", Toast.LENGTH_SHORT).show();
-//                        if(autoCheckbox.isChecked()){
-//                            requestActivityUpdates();
-//                        }
-//                    }
-//                    return true;
-//                } else {
-//                    controlGPS();
-//                    removeActivityUpdates();
-//                    item.setChecked(true);
-//                    item.setIcon(R.drawable.gps_off_highres);
-//                    Toast.makeText(getApplicationContext(), "Stop Tracking", Toast.LENGTH_SHORT).show();
-//                    return true;
-//                }
-
-
             case R.id.carMenuItem:
-                setVehicle("Auto");
-                //removeActivityUpdates();
+                setVehicle("Car");
+                menu.getItem(0).setIcon(R.drawable.car);
                 carCheckbox.setChecked(true);
                 Log.e("carMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
+
             case R.id.pedestrianMenuItem:
-                setVehicle("Fußgänger");
-                //removeActivityUpdates();
+                setVehicle("Walking");
+                menu.getItem(0).setIcon(R.drawable.walking);
                 pedestrianCheckbox.setChecked(true);
                 Log.e("pedestMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.bicycleMenuItem:
-                setVehicle("Fahrrad");
-                //removeActivityUpdates();
+                setVehicle("Bike");
+                menu.getItem(0).setIcon(R.drawable.bike);
                 bicycleCheckbox.setChecked(true);
                 Log.e("bicyMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
@@ -472,11 +460,9 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             default:
                 return super.onOptionsItemSelected(item);
 
-
         }
-
-
     }
+
 
     protected ServiceConnection mServerConn = new ServiceConnection() {
         @Override
@@ -487,11 +473,13 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             mBound = true;
         }
 
+
         @Override
         public void onServiceDisconnected(ComponentName name) {
             Log.d("TAG", "onServiceDisconnected");
         }
     };
+
 
     @Override
     public void onResult(@NonNull Result result) {
@@ -500,6 +488,8 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             Log.e(TAG, "Error adding or removing activity detection: " + result.getStatus().getStatusMessage());
         }
     }
+
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -514,8 +504,9 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
         super.onPause();
     }
-    public class GPSBroadcastReceiver extends BroadcastReceiver {
 
+
+    public class GPSBroadcastReceiver extends BroadcastReceiver {
 
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -529,7 +520,6 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             createPoint(lon, lat);
         }
     }
-
 
 
     public void createPoint(double lon, double lat) {
@@ -565,7 +555,6 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         Log.e("newLoc", newLocation.toString());
 
         addFeatureToLocalgeodatabase(newLocation);
-
 
     }
 
@@ -699,8 +688,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             //changeLocationRequestInterval(gpsInterval);
             //controlGPS();
 
-        }
-        else if (resultCode == 250) {
+        } else if (resultCode == 250) {
 
             String state = data.getExtras().getString("state");
             Log.e("state", state);
@@ -813,26 +801,32 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
         }
 
+
         switch (detectedActivities.get(number).getType()) {
 
             case 1:
                 menu.getItem(0).setIcon(R.drawable.bike);
+                setVehicle("Bike");
                 return true;
 
             case 0:
                 menu.getItem(0).setIcon(R.drawable.car);
+                setVehicle("Car");
                 return true;
 
             case 2:
                 menu.getItem(0).setIcon(R.drawable.walking);
+                setVehicle("Walking");
                 return true;
 
             case 8:
                 menu.getItem(0).setIcon(R.drawable.running);
+                setVehicle("Running");
                 return true;
 
             case 3:
                 menu.getItem(0).setIcon(R.drawable.still);
+                setVehicle("Still");
                 return true;
 
             case 5:
@@ -841,10 +835,12 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
             case 4:
                 menu.getItem(0).setIcon(R.drawable.questionmark);
+                setVehicle("Unkown");
                 return true;
 
             default:
                 menu.getItem(0).setIcon(R.drawable.questionmark);
+                setVehicle("Unkown");
                 return true;
 
 
@@ -867,10 +863,18 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         public void onReceive(Context context, Intent intent) {
             ArrayList<DetectedActivity> updatedActivities =
                     intent.getParcelableArrayListExtra(Constants.ACTIVITY_EXTRA);
-            Log.i(TAG,"Activity Received");
+            Log.i(TAG, "Activity Received");
             setIconActivity(updatedActivities);
 
         }
+    }
+
+    public static void setContext(Context mainContext) {
+        MainActivity.context = mainContext;
+    }
+
+    public static Context getContext() {
+        return context;
     }
 
 /*    *//**
@@ -899,7 +903,9 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
-    *//**
+    */
+
+    /**
      * stop requesting the activity and remove the activity updates for the PendingIntent
      *//*
     public void removeActivityUpdates() {
@@ -918,7 +924,48 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             ).setResultCallback(this);
         }
     }*/
+    private void alertMessageNoGps() {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage("Dein GPS ist ausgeschaltet, möchtest du es einschalten?")
+                .setCancelable(false)
+                .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
+                    public void onClick(@SuppressWarnings("unused") final DialogInterface dialog, @SuppressWarnings("unused") final int id) {
+                        startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                    }
+                })
+                .setNegativeButton("Nein", new DialogInterface.OnClickListener() {
+                    public void onClick(final DialogInterface dialog, @SuppressWarnings("unused") final int id) {
+                        dialog.cancel();
+                    }
+                });
+        final AlertDialog alert = builder.create();
+        alert.show();
+    }
 
+
+    private void alertMessageNoUser() {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage("Es wurden noch keine Benutzerdaten eingegeben, möchtest du das jetzt erledigen?")
+                .setCancelable(false)
+                .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
+                    public void onClick(@SuppressWarnings("unused") final DialogInterface dialog, @SuppressWarnings("unused") final int id) {
+                        startActivity(username_intent);
+                    }
+                })
+                .setNegativeButton("Nein", new DialogInterface.OnClickListener() {
+                    public void onClick(final DialogInterface dialog, @SuppressWarnings("unused") final int id) {
+                        dialog.cancel();
+                    }
+                });
+        final AlertDialog alert = builder.create();
+        alert.show();
+    }
+
+
+    public void updateQueryFeatureLayer() {
+        String user_id = sharedpreferences.getString("user_id", "");
+        new QueryFeatureLayer().execute(user_id);
+    }
 }
 
 

@@ -167,6 +167,7 @@ public class LocalGeodatabase {
 
                 if (sucessState.equals("Completed")) {
                     Log.i(MainActivity.TAG, status.getStatus().toString());
+                    mainActivity.showToast("Syncronisation abgeschlossen");
                     new QueryFeatureLayer().execute(user_id);
                 }
 
@@ -221,6 +222,14 @@ public class LocalGeodatabase {
                 //MainActivity activity = (MainActivity) context;
                 // update progress bar on main thread
                 showProgressBar(mainActivity, progress);
+
+                String sucessState = status.getStatus().toString();
+
+                if (sucessState.equals("Completed")) {
+                    map.getLayer(2).setVisible(false);
+                    mainActivity.updateQueryFeatureLayer();
+                    Log.e("DB da", sucessState + map.getLayers().toString());
+                }
 
 
             }
