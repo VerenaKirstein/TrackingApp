@@ -35,9 +35,9 @@
         <menu>
         <group android:checkableBehavior="single">
             <item
-                android:id="@+id/carMenuItem"
+                android:id="@+id/auto"
                 app:showAsAction="never"
-                android:title="@string/car" />
+                android:title="@string/automatic" />
             <item
                 android:id="@+id/pedestrianMenuItem"
                 app:showAsAction="never"
@@ -47,9 +47,9 @@
                 app:showAsAction="never"
                 android:title="@string/bicycle" />
             <item
-                android:id="@+id/auto"
+                android:id="@+id/carMenuItem"
                 app:showAsAction="never"
-                android:title="@string/automatic" />
+                android:title="@string/car" />
 
         </group>
     </menu>

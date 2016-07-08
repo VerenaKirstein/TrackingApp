@@ -1,8 +1,6 @@
 package de.hsbo.veki.trackingapp;
 
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -14,14 +12,6 @@ import android.widget.Spinner;
 import android.widget.Toast;
 
 public class ChangeUsernameActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
-
-    public static final String PREFS_NAME = "TRACKINGAPP";
-    public static final String USERNAME = "username";
-    public static final String AGE = "age";
-    public static final String SEX = "sex";
-    public static final String PROFESSION = "profession";
-    public static final String USER_ID = "user_id";
-    SharedPreferences sharedpreferences;
 
     private Button btn_save;
     private Button btn_abort;
@@ -36,7 +26,7 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
     private String profession_item = null;
     private Integer user_id_item = null;
 
-    private Intent main_activity_intent;
+    private Intent main_activity__user_intent = null;
 
 
     @Override
@@ -44,16 +34,15 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_change_username_layout);
 
-        main_activity_intent = new Intent();
 
 
         btn_save = (Button) findViewById(R.id.btn_save_username);
         btn_abort = (Button) findViewById(R.id.btn_abort_username);
-
         etext_username = (EditText) findViewById(R.id.editText_username);
         etext_age = (EditText) findViewById(R.id.editText_age);
         etext_profession = (EditText) findViewById(R.id.editText_profession);
         spinner_sex = (Spinner) findViewById(R.id.spinner_sex);
+
 
         // Create an ArrayAdapter using the string array and a default spinner layout
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
@@ -64,7 +53,6 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
         spinner_sex.setAdapter(adapter);
         //spinner_sex.setSelection(0);
 
-        sharedpreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
         btn_save.setOnClickListener(new View.OnClickListener() {
 
@@ -75,49 +63,37 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
                 username_item = etext_username.getText().toString();
                 age_item = etext_age.getText().toString();
                 profession_item = etext_profession.getText().toString();
-                user_id_item = (username_item+age_item+profession_item).hashCode();
-
                 spinner_sex_item = (String) spinner_sex.getSelectedItem();
 
+                // Create UserID from input parameters
+                user_id_item = (username_item + age_item + profession_item + spinner_sex_item).hashCode();
 
                 if (!username_item.isEmpty() && !age_item.isEmpty() && !profession_item.isEmpty()) {
 
 
                     if (Integer.parseInt(age_item) > 0 && Integer.parseInt(age_item) < 100) {
 
-                        // Set Username on Device
-                        SharedPreferences.Editor editor = sharedpreferences.edit();
+                        main_activity__user_intent = new Intent();
 
-                        // Delete last username
-                        editor.clear();
+                        main_activity__user_intent.putExtra("Username", username_item);
+                        main_activity__user_intent.putExtra("UserID", String.valueOf(user_id_item));
+                        main_activity__user_intent.putExtra("Age", age_item);
+                        main_activity__user_intent.putExtra("Sex", spinner_sex_item);
+                        main_activity__user_intent.putExtra("Profession", profession_item);
 
-                        editor.putString(USERNAME, username_item);
-                        editor.putString(PROFESSION, profession_item);
-                        editor.putString(SEX, spinner_sex_item);
-                        editor.putString(USER_ID, user_id_item.toString());
-
-                        editor.apply();
-
-                        // Back to MainActivity
-                        main_activity_intent.putExtra("state", "Benutzername: " + username_item + " gesetzt!");
-                        setResult(250, main_activity_intent);
+                        setResult(200, main_activity__user_intent);
                         finish();
 
                     } else {
                         Toast.makeText(getApplicationContext(),
-                                "Alter falsch eingegeben", Toast.LENGTH_LONG).show();
+                                "Alter falsch eingegeben!", Toast.LENGTH_LONG).show();
                     }
-
-
 
                 } else {
 
                     Toast.makeText(getApplicationContext(),
                             "Eingaben unvollständig!", Toast.LENGTH_LONG).show();
                 }
-
-
-
             }
         });
 
@@ -126,9 +102,7 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
             @Override
             public void onClick(View arg0) {
 
-
-                main_activity_intent.putExtra("state", "Änderung abgebrochen");
-                setResult(250, main_activity_intent);
+                setResult(200, main_activity__user_intent);
                 finish();
 
             }
@@ -144,6 +118,5 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
 
     @Override
     public void onNothingSelected(AdapterView<?> adapterView) {
-
     }
 }

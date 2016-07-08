@@ -1,8 +1,5 @@
 package de.hsbo.veki.trackingapp;
 
-import android.content.Context;
-import android.content.res.Resources;
-
 import com.google.android.gms.location.DetectedActivity;
 
 /**
@@ -17,7 +14,7 @@ public final class Constants {
     public static final String BROADCAST_ACTION = PACKAGE_NAME + ".BROADCAST_ACTION";
     public static final String ACTIVITY_EXTRA = PACKAGE_NAME + ".ACTIVITY_EXTRA";
     public static final String TAG = "SAMPLE_ANDROID_APP";
-    public static final String PREFS_NAME = "TRACKINGAPP";
+    public static final String PREFS_NAME = "TRACKING";
 
 
     /**

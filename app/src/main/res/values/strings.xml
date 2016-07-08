@@ -12,8 +12,8 @@
 
     <string name="action_location_found">GPS</string>
     <string name="action_activity_found">Activity found</string>
-    <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdb</string>
-    <string name="config.geodatabase.name">bo</string>
+    <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdbnew</string>
+    <string name="config.geodatabase.name">mma.bo</string>
     <string name="config.local.basemap">SanFrancisco.tpk</string>
 
     <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingApp/FeatureServer/0</string>
@@ -24,7 +24,7 @@
     <string name="SpeedHint">Speed</string>
     <string name="ButtonSyncHint">Sync!</string>
 
-
+    <string name="preference_file_key">TRACKINGAPP</string>
     <string name="sex_default">Männlich</string>
 
     <string-array name="sex_array">

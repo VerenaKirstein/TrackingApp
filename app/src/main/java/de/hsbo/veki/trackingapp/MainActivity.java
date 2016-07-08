@@ -9,7 +9,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
@@ -36,11 +35,7 @@ import com.esri.android.map.Callout;
 import com.esri.android.map.FeatureLayer;
 import com.esri.android.map.GraphicsLayer;
 import com.esri.android.map.MapView;
-import com.esri.android.map.ags.ArcGISFeatureLayer;
 import com.esri.android.map.event.OnSingleTapListener;
-import com.esri.core.geodatabase.Geodatabase;
-import com.esri.core.geodatabase.GeodatabaseFeatureServiceTable;
-import com.esri.core.geodatabase.GeodatabaseFeatureTable;
 import com.esri.core.geometry.GeometryEngine;
 import com.esri.core.geometry.Point;
 import com.esri.core.geometry.SpatialReference;
@@ -49,7 +44,6 @@ import com.esri.core.map.Graphic;
 import com.esri.core.symbol.SimpleMarkerSymbol;
 import com.esri.core.table.TableException;
 import com.esri.core.tasks.geodatabase.GeodatabaseSyncTask;
-import com.esri.core.tasks.query.QueryParameters;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.Result;
 import com.google.android.gms.common.api.ResultCallback;
@@ -64,7 +58,6 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.Map;
 
 import static java.lang.String.valueOf;
@@ -73,9 +66,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
     // Attributes for Application
     public static String TAG = "MainActivity";
-    private SharedPreferences sharedpreferences;
     public static ProgressDialog progressDialog;
-    private Toast toast;
     private static Context context;
 
 
@@ -84,18 +75,11 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     private File demoDataFile;
     private String offlineDataSDCardDirName;
     private String filename;
-    private String localGdbFilePath;
     private String OFFLINE_FILE_EXTENSION = ".geodatabase";
-    private static Geodatabase geodatabase = null;
-    private GeodatabaseFeatureTable geodatabaseFeatureTable;
-    private GeodatabaseFeatureServiceTable featureServiceTable;
-    private QueryParameters queryParameters;
     private Callout callout;
     private LocalGeodatabase localGeodatabase;
     private String username;
-    private String age;
-    private String sex;
-    private String profession;
+
     private String user_id = null;
 
 
@@ -103,11 +87,8 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     public static MapView mapView;
     static String featureLayerURL;
     public static String featureServiceURL;
-    private FeatureLayer featureLayer;
-    private ArcGISFeatureLayer arcGISFeatureLayer;
     static GraphicsLayer graphicsLayer;
     private FeatureLayer offlineFeatureLayer;
-    private QueryFeatureLayer queryFeatureLayer;
 
 
     // Attributes for UserInterface
@@ -122,6 +103,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     private MenuItem autoCheckbox = null;
     public static Integer gpsInterval = 15000;
     private Intent username_intent;
+    private UserCredentials userCredentials;
 
 
     // Attributes for BackgroundService
@@ -144,7 +126,6 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
         MainActivity.setContext(this);
         progressDialog = new ProgressDialog(MainActivity.this);
 
@@ -163,14 +144,14 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
 
         // Read Username from Device
-        HashMap<String, String> userCredentials = getSharedpreferences(Constants.PREFS_NAME);
-        username = userCredentials.get("username");
+        userCredentials = new UserCredentials(getContext());
 
-        if (username.isEmpty()) {
-            Toast.makeText(getApplicationContext(), "Bitte Benutzerdaten eingeben!", Toast.LENGTH_LONG).show();
-        } else {
-            Toast.makeText(getApplicationContext(), "Eingeloggt als: " + username + ".", Toast.LENGTH_LONG).show();
+        // No User? Show alert to get User information
+        if (userCredentials.getUserid().equals("null")) {
+            alertMessageNoUser();
         }
+
+        Log.i("userCredentials", userCredentials.getProfession());
 
 
         // Get FeatureURL
@@ -199,11 +180,8 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                 mapView.addLayer(offlineFeatureLayer);
                 mapView.getLayer(2).setVisible(false);
 
-                Log.e("DB", offlineFeatureLayer.getFeatureTable().toString());
-                Log.e("DB", offlineFeatureLayer.getFeatureTable().getFields().toString());
-                Log.e("UserCred", userCredentials.toString());
                 // Create a personal FeatureLayer and add to map
-                user_id = userCredentials.get("user_id");
+                user_id = userCredentials.getUserid();
 
                 // Load FeatureLayer for user_id
                 new QueryFeatureLayer().execute(user_id);
@@ -225,7 +203,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             @Override
             public void onSingleTap(float x, float y) {
 
-                if (!user_id.isEmpty()) {
+                if (user_id != "null") {
 
                     long[] selectedFeatures = offlineFeatureLayer.getFeatureIDs(x, y, 25, 1);
 
@@ -234,13 +212,14 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                         // Feature is selected
                         offlineFeatureLayer.selectFeatures(selectedFeatures, false);
 
-
+                        // Get Feature attributes
                         Feature feature = offlineFeatureLayer.getFeature(selectedFeatures[0]);
                         String featureUser_ID = feature.getAttributeValue("UserID").toString();
                         String featureUsername = feature.getAttributeValue("Username").toString();
                         String featureVehicle = feature.getAttributeValue("Vehicle").toString();
                         String featureTime = feature.getAttributeValue("Time").toString();
 
+                        // Show information if user is owner of the point
                         if (user_id.equals(featureUser_ID)) {
                             callout = mapView.getCallout();
                             callout.setStyle(R.xml.tracked_point);
@@ -270,8 +249,8 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         intent = new Intent(this, BackgroundLocationService.class);
         IntentFilter intentFilter = new IntentFilter("android.intent.action.MAIN");
 
-        // Initialize Userinput Inent
-        username_intent = new Intent(this, ChangeUsernameActivity.class);
+//        // Initialize Userinput Inent
+//        username_intent = new Intent(this, ChangeUsernameActivity.class);
 
         gpsBroadcastReceiver = new GPSBroadcastReceiver();
         mBroadcastReceiver = new ActivityDetectionBroadcastReceiver();
@@ -320,17 +299,17 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_main, menu);
 
+        autoCheckbox = menu.getItem(3).getSubMenu().getItem(0);
         pedestrianCheckbox = menu.getItem(3).getSubMenu().getItem(1);
         bicycleCheckbox = menu.getItem(3).getSubMenu().getItem(2);
-        autoCheckbox = menu.getItem(3).getSubMenu().getItem(3);
-        carCheckbox = menu.getItem(3).getSubMenu().getItem(0);
+        carCheckbox = menu.getItem(3).getSubMenu().getItem(3);
 
         if (isMyServiceRunning(BackgroundLocationService.class)) {
             menu.getItem(1).setChecked(false).setIcon(R.drawable.gps_on_highres);
             menu.getItem(0).setVisible(true);
         }
 
-        String getVehicle = sharedpreferences.getString("vehicle", "");
+        String getVehicle = userCredentials.getVehicle();
 
         switch (getVehicle) {
             case "Auto":
@@ -343,19 +322,11 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                 autoCheckbox.setChecked(true);
             default:
                 autoCheckbox.setChecked(true);
-                setVehicle("Automatisch erkennen");
-
+                userCredentials.setVehicle("Automatisch erkennen");
         }
 
         return true;
 
-    }
-
-    public void setVehicle(String vehicle) {
-
-        SharedPreferences.Editor editor = sharedpreferences.edit();
-        editor.putString("vehicle", vehicle);
-        editor.apply();
     }
 
 
@@ -372,33 +343,41 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         switch (item.getItemId()) {
 
             case R.id.action_username:
-                Intent username_intent = new Intent(this, ChangeUsernameActivity.class);
-                startActivity(username_intent);
+
+                Intent interval_intent_username = new Intent(getApplicationContext(), ChangeUsernameActivity.class);
+                startActivityForResult(interval_intent_username, 200);
                 return true;
+
             case R.id.action_interval:
+
                 if (mBound) {
                     stopService(intent);
                     unbindService(mServerConn);
                     LocalBroadcastManager.getInstance(this).unregisterReceiver(gpsBroadcastReceiver);
                     mBound = false;
                 }
+
                 Intent interval_intent = new Intent(getApplicationContext(), ChangeGpsUpdateInterval.class);
                 startActivityForResult(interval_intent, 100);
                 return true;
 
             case R.id.action_location_found:
 
-                user_id = sharedpreferences.getString("user_id", "");
+                user_id = userCredentials.getUserid();
 
                 final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
                 if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
 
 
-                    if (user_id.isEmpty()) {
+                    if (user_id == "null") {
+
                         alertMessageNoUser();
+
                     } else {
+
                         if (item.isChecked()) {
+
                             LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
                             item.setChecked(false);
                             bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
@@ -426,34 +405,31 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                         }
                     }
                 } else {
+
                     alertMessageNoGps();
                 }
 
 
             case R.id.carMenuItem:
-                setVehicle("Car");
+                userCredentials.setVehicle("Car");
                 menu.getItem(0).setIcon(R.drawable.car);
                 carCheckbox.setChecked(true);
-                Log.e("carMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
-
             case R.id.pedestrianMenuItem:
-                setVehicle("Walking");
+                userCredentials.setVehicle("Walking");
                 menu.getItem(0).setIcon(R.drawable.walking);
                 pedestrianCheckbox.setChecked(true);
-                Log.e("pedestMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.bicycleMenuItem:
-                setVehicle("Bike");
+                userCredentials.setVehicle("Bike");
                 menu.getItem(0).setIcon(R.drawable.bike);
                 bicycleCheckbox.setChecked(true);
-                Log.e("bicyMenuItem", sharedpreferences.getString("vehicle", ""));
                 return true;
 
             case R.id.auto:
-                setVehicle(mDetectedActivities.get(0).toString());
+                userCredentials.setVehicle(mDetectedActivities.get(0).toString());
                 autoCheckbox.setChecked(true);
                 return true;
 
@@ -540,9 +516,9 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             double distance = Math.sqrt(Math.pow(oldLocation.getX() - newLocation.getX(), 2) + Math.pow(oldLocation.getY() - newLocation.getY(), 2));
             double geschw = distance / (3.6);
             geschw = Math.round(geschw * 100) / 100.0;
-            bewGeschw.setText(roundValue(geschw, 2) + " m/s");
+            bewGeschw.setText(roundValue(geschw, 1) + "m/s");
         } else {
-            bewGeschw.setText(valueOf(0.0 + " m/s"));
+            bewGeschw.setText(valueOf(0.0 + "m/s"));
         }
 
         latitudeText.setText(roundValue(lat, 7));
@@ -565,21 +541,17 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
     private void addFeatureToLocalgeodatabase(Point newLocation) {
 
-        HashMap<String, String> userCredentials = getSharedpreferences(Constants.PREFS_NAME);
-
-        Log.e("userCred", userCredentials.toString());
-
         DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.MEDIUM);
         String newLocationTime = dateFormat.format(Calendar.getInstance().getTime());
 
         //make a map of attributes
         Map<String, Object> attributes = new HashMap<>();
-        attributes.put("UserID", userCredentials.get("user_id"));
-        attributes.put("Username", sharedpreferences.getString("username", ""));
-        attributes.put("Sex", sharedpreferences.getString("sex", ""));
-        attributes.put("Age", sharedpreferences.getString("age", ""));
-        attributes.put("Profession", sharedpreferences.getString("profession", ""));
-        attributes.put("Vehicle", sharedpreferences.getString("vehicle", ""));
+        attributes.put("UserID", userCredentials.getUserid());
+        attributes.put("Username", userCredentials.getUsername());
+        attributes.put("Sex", userCredentials.getSex());
+        attributes.put("Age", userCredentials.getAge());
+        attributes.put("Profession", userCredentials.getProfession());
+        attributes.put("Vehicle", userCredentials.getVehicle());
         attributes.put("Time", newLocationTime);
 
         Log.e("attributes", attributes.toString());
@@ -590,6 +562,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             e.printStackTrace();
         }
 
+        // Log all Features in Database
         try {
             long size = localGeodatabase.getGeodatabaseFeatureTable().getNumberOfFeatures();
 
@@ -635,23 +608,6 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     }
 
 
-    public HashMap<String, String> getSharedpreferences(String prefs_name) {
-
-        sharedpreferences = getSharedPreferences(prefs_name, Context.MODE_PRIVATE);
-
-        Hashtable<String, String> userCredentialsTable = new Hashtable<>();
-        HashMap<String, String> userCredentials = new HashMap<>(userCredentialsTable);
-        userCredentials.put("username", sharedpreferences.getString("username", ""));
-        userCredentials.put("age", sharedpreferences.getString("age", ""));
-        userCredentials.put("sex", sharedpreferences.getString("sex", ""));
-        userCredentials.put("profession", sharedpreferences.getString("profession", ""));
-        userCredentials.put("user_id", sharedpreferences.getString("user_id", ""));
-        userCredentials.put("vehicle", sharedpreferences.getString("vehicle", ""));
-
-        return userCredentials;
-    }
-
-
     /*
     * Create the geodatabase file location and name structure
     */
@@ -669,91 +625,47 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     }
 
     @Override
-    protected void onActivityResult(int requestCode,
-                                    int resultCode, Intent data) {
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == 100) {
 
-            // Storing result in a variable called myvar
-            // get("website") 'website' is the key value result data
-            Log.i(TAG, "Result");
-            gpsInterval = data.getExtras().getInt("connected");
-            intent.putExtra("Update_Interval", gpsInterval);
 
-            if (!menu.getItem(1).isChecked()) {
-                LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
-                bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
-                startService(intent);
-            }
-            //changeLocationRequestInterval(gpsInterval);
-            //controlGPS();
+        switch (resultCode) {
+            case 100:
+                Log.i(TAG, "Result 100");
+                gpsInterval = data.getExtras().getInt("connected");
+                intent.putExtra("Update_Interval", gpsInterval);
 
-        } else if (resultCode == 250) {
+                if (!menu.getItem(1).isChecked()) {
+                    LocalBroadcastManager.getInstance(this).registerReceiver(gpsBroadcastReceiver, new IntentFilter(BackgroundLocationService.BROADCAST_ACTION));
+                    bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
+                    startService(intent);
+                }
 
-            String state = data.getExtras().getString("state");
-            Log.e("state", state);
-            Toast.makeText(getApplicationContext(), state, Toast.LENGTH_LONG).show();
+
+            case 200:
+
+                if (data != null) {
+                    Log.i(TAG, "Result 200");
+                    userCredentials.setUsername(data.getExtras().getString("Username"));
+                    userCredentials.setUserid(data.getExtras().getString("UserID"));
+                    userCredentials.setAge(data.getExtras().getString("Age"));
+                    userCredentials.setProfession(data.getExtras().getString("Profession"));
+                    userCredentials.setSex(data.getExtras().getString("Sex"));
+
+                    Toast.makeText(getApplicationContext(), "Benutzerdaten geändert. Username: " +
+                            userCredentials.getUsername() + "!", Toast.LENGTH_LONG).show();
+
+                    Log.e("resultcode 200: ", userCredentials.toString());
+                } else {
+                    Toast.makeText(getApplicationContext(),
+                            "Benutzerdaten ändern abgebrochen!", Toast.LENGTH_LONG).show();
+                }
+
+
         }
 
     }
 
-//    public static class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
-//        @Override
-//        protected FeatureResult doInBackground(String... params) {
-//
-//            String whereClause = "UserID='" + params[0] + "'";
-//
-//            Log.e("Where", whereClause);
-//
-//            // Define a new query and set parameters
-//            QueryParameters mParams = new QueryParameters();
-//            mParams.setWhere(whereClause);
-//            mParams.setReturnGeometry(true);
-//
-//            // Define the new instance of QueryTask
-//            QueryTask queryTask = new QueryTask(featureLayerURL);
-//            FeatureResult results;
-//
-//            try {
-//                // run the querytask
-//                results = queryTask.execute(mParams);
-//                return results;
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-//            return null;
-//        }
-//
-//        @Override
-//        protected void onPostExecute(FeatureResult results) {
-//
-//            // Remove the result from previously run query task
-//            graphicsLayer.removeAll();
-//
-//            // Define a new marker symbol for the result graphics
-//            SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.BLUE, 10, SimpleMarkerSymbol.STYLE.CIRCLE);
-//
-//            // Envelope to focus on the map extent on the results
-//            Envelope extent = new Envelope();
-//
-//            // iterate through results
-//            for (Object element : results) {
-//                // if object is feature cast to feature
-//                if (element instanceof Feature) {
-//                    Feature feature = (Feature) element;
-//                    // convert feature to graphic
-//                    Graphic graphic = new Graphic(feature.getGeometry(), sms, feature.getAttributes());
-//                    // merge extent with point
-//                    extent.merge((Point) graphic.getGeometry());
-//                    // add it to the layer
-//                    graphicsLayer.addGraphic(graphic);
-//                }
-//            }
-//
-//            // Set the map extent to the envelope containing the result graphics
-//            mapView.setExtent(extent, 100);
-//        }
-//    }
 
     public void showToast(final String message) {
         // Show toast message on the main thread only; this function can be
@@ -806,47 +718,49 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
             case 1:
                 menu.getItem(0).setIcon(R.drawable.bike);
-                setVehicle("Bike");
+                userCredentials.setVehicle("Bike");
                 return true;
 
             case 0:
                 menu.getItem(0).setIcon(R.drawable.car);
-                setVehicle("Car");
+                userCredentials.setVehicle("Car");
                 return true;
 
             case 2:
                 menu.getItem(0).setIcon(R.drawable.walking);
-                setVehicle("Walking");
+                userCredentials.setVehicle("Walking");
                 return true;
 
             case 8:
                 menu.getItem(0).setIcon(R.drawable.running);
-                setVehicle("Running");
+                userCredentials.setVehicle("Running");
                 return true;
 
             case 3:
                 menu.getItem(0).setIcon(R.drawable.still);
-                setVehicle("Still");
+                userCredentials.setVehicle("Still");
                 return true;
 
             case 5:
                 menu.getItem(0).setIcon(R.drawable.tilting);
+                userCredentials.setVehicle("Unkown");
                 return true;
 
             case 4:
                 menu.getItem(0).setIcon(R.drawable.questionmark);
-                setVehicle("Unkown");
+                userCredentials.setVehicle("Unkown");
                 return true;
 
             default:
                 menu.getItem(0).setIcon(R.drawable.questionmark);
-                setVehicle("Unkown");
+                userCredentials.setVehicle("Unkown");
                 return true;
 
 
         }
 
     }
+
 
     public MainActivity getMainActivity() {
         return this;
@@ -949,7 +863,10 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
                 .setCancelable(false)
                 .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
                     public void onClick(@SuppressWarnings("unused") final DialogInterface dialog, @SuppressWarnings("unused") final int id) {
-                        startActivity(username_intent);
+
+                        Intent interval_intent = new Intent(getApplicationContext(), ChangeUsernameActivity.class);
+                        startActivityForResult(interval_intent, 200);
+
                     }
                 })
                 .setNegativeButton("Nein", new DialogInterface.OnClickListener() {
@@ -963,7 +880,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
 
     public void updateQueryFeatureLayer() {
-        String user_id = sharedpreferences.getString("user_id", "");
+        String user_id = userCredentials.getUserid();
         new QueryFeatureLayer().execute(user_id);
     }
 }

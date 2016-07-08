@@ -193,7 +193,7 @@ public class LocalGeodatabase {
         CallbackListener<String> gdbResponseCallback = new CallbackListener<String>() {
             @Override
             public void onError(final Throwable e) {
-                Log.e(MainActivity.TAG, "Error creating geodatabase" + e);
+                Log.e(MainActivity.TAG, "Error creating geodatabase " + e);
                 MainActivity.progressDialog.dismiss();
             }
 
