@@ -92,6 +92,7 @@
         mapoptions.MapType="OSM"
         mapoptions.center="51.447776, 7.271262"
         mapoptions.ZoomLevel="12"
-        android:layout_below="@+id/linearLayout"></com.esri.android.map.MapView>
+        android:layout_below="@+id/linearLayout" />
+    
 
 </RelativeLayout>
