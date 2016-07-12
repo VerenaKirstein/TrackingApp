@@ -226,7 +226,7 @@ public class LocalGeodatabase {
                 String sucessState = status.getStatus().toString();
 
                 if (sucessState.equals("Completed")) {
-                    map.getLayer(2).setVisible(false);
+                    map.getLayer(1).setVisible(false);
                     mainActivity.updateQueryFeatureLayer();
                     Log.e("DB da", sucessState + map.getLayers().toString());
                 }
