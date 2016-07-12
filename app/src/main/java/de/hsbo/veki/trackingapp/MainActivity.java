@@ -16,6 +16,7 @@ import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AlertDialog;
@@ -62,7 +63,7 @@ import java.util.Map;
 
 import static java.lang.String.valueOf;
 
-public class MainActivity extends AppCompatActivity implements ResultCallback {
+public class MainActivity extends AppCompatActivity {
 
     // Attributes for Application
     public static String TAG = "MainActivity";
@@ -129,12 +130,10 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         MainActivity.setContext(this);
         progressDialog = new ProgressDialog(MainActivity.this);
 
-
         // Get resource names
         demoDataFile = Environment.getExternalStorageDirectory();
         offlineDataSDCardDirName = this.getResources().getString(R.string.config_data_sdcard_offline_dir);
         filename = this.getResources().getString(R.string.config_geodatabase_name);
-
 
         // Load UserInterface-Elements
         latitudeText = (TextView) findViewById(R.id.GPSLatText);
@@ -172,11 +171,11 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         try {
 
             if (networkInfo != null && networkInfo.isConnected()) {
-
+                Log.i(TAG," set local Geodatabase");
                 localGeodatabase = new LocalGeodatabase(createGeodatabaseFilePath(), featureServiceURL, getMainActivity(), mapView);
                 offlineFeatureLayer = localGeodatabase.getOfflineFeatureLayer();
 
-
+                Log.i(TAG,"  local Geodatabase");
                 mapView.addLayer(offlineFeatureLayer);
                 mapView.getLayer(2).setVisible(false);
 
@@ -259,7 +258,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         // Set the confidence level of each monitored activity to zero.
         for (int i = 0; i < Constants.MONITORED_ACTIVITIES.length; i++) {
 
-            Log.i(TAG, "Set onfidence level");
+            Log.i(TAG, "Set confidence level");
             mDetectedActivities.add(new DetectedActivity(Constants.MONITORED_ACTIVITIES[i], 0));
         }
 
@@ -271,9 +270,9 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         }
 
 
-        syncButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
+            syncButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
 
                 Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
                 try {
@@ -289,6 +288,14 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         });
 
 
+
+    }
+    public static void setContext(Context mainContext) {
+        MainActivity.context = mainContext;
+    }
+
+    public static Context getContext() {
+        return context;
     }
 
 
@@ -332,8 +339,10 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
+
         unbindService(mServerConn);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(gpsBroadcastReceiver);
+        super.onDestroy();
     }
 
 
@@ -457,13 +466,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
     };
 
 
-    @Override
-    public void onResult(@NonNull Result result) {
-        if (result.getStatus().isSuccess()) {
-        } else {
-            Log.e(TAG, "Error adding or removing activity detection: " + result.getStatus().getStatusMessage());
-        }
-    }
+
 
 
     @Override
@@ -516,9 +519,9 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
             double distance = Math.sqrt(Math.pow(oldLocation.getX() - newLocation.getX(), 2) + Math.pow(oldLocation.getY() - newLocation.getY(), 2));
             double geschw = distance / (3.6);
             geschw = Math.round(geschw * 100) / 100.0;
-            bewGeschw.setText(roundValue(geschw, 1) + "m/s");
+            bewGeschw.setText(roundValue(geschw, 1) + " m/s");
         } else {
-            bewGeschw.setText(valueOf(0.0 + "m/s"));
+            bewGeschw.setText(valueOf(0.0 + " m/s"));
         }
 
         latitudeText.setText(roundValue(lat, 7));
@@ -526,11 +529,13 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
         if (newLocation != null) {
             updateGraphic(newLocation);
+            Log.e("newLoc", newLocation.toString());
+            addFeatureToLocalgeodatabase(newLocation);
         }
 
-        Log.e("newLoc", newLocation.toString());
 
-        addFeatureToLocalgeodatabase(newLocation);
+
+
 
     }
 
@@ -553,6 +558,7 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         attributes.put("Profession", userCredentials.getProfession());
         attributes.put("Vehicle", userCredentials.getVehicle());
         attributes.put("Time", newLocationTime);
+        attributes.put("Speed", bewGeschw.getText().toString());
 
         Log.e("attributes", attributes.toString());
 
@@ -713,7 +719,6 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
 
         }
 
-
         switch (detectedActivities.get(number).getType()) {
 
             case 1:
@@ -783,61 +788,8 @@ public class MainActivity extends AppCompatActivity implements ResultCallback {
         }
     }
 
-    public static void setContext(Context mainContext) {
-        MainActivity.context = mainContext;
-    }
 
-    public static Context getContext() {
-        return context;
-    }
 
-/*    *//**
-     * request Detected Activities Updates
-     *//*
-    public void requestActivityUpdates() {
-        if (client != null) {
-            if (!client.isConnected()) {
-                Toast.makeText(this, "Not connected",
-                        Toast.LENGTH_SHORT).show();
-                return;
-            }
-            ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(
-                    client,
-                    Constants.DETECTION_INTERVAL_IN_MILLISECONDS,
-                    getActivityDetectionPendingIntent()
-            ).setResultCallback(this);
-        }
-    }
-
-    private PendingIntent getActivityDetectionPendingIntent() {
-        Intent intent = new Intent(this, DetectedActivitiesIntentService.class);
-
-        // We use FLAG_UPDATE_CURRENT so that we get the same pending intent back when calling
-        // requestActivityUpdates() and removeActivityUpdates().
-        return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-    }
-
-    */
-
-    /**
-     * stop requesting the activity and remove the activity updates for the PendingIntent
-     *//*
-    public void removeActivityUpdates() {
-        if (menu.getItem(0) != null && menu.getItem(0).isVisible())
-            menu.getItem(0).setVisible(false);
-        if (client != null) {
-            if (!client.isConnected()) {
-                Toast.makeText(this, "Not Connected", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            // Remove all activity updates for the PendingIntent that was used to request activity
-            // updates.
-            ActivityRecognition.ActivityRecognitionApi.removeActivityUpdates(
-                    client,
-                    getActivityDetectionPendingIntent()
-            ).setResultCallback(this);
-        }
-    }*/
     private void alertMessageNoGps() {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setMessage("Dein GPS ist ausgeschaltet, möchtest du es einschalten?")

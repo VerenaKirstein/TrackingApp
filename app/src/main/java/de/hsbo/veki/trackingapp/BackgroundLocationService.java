@@ -115,14 +115,6 @@ public class BackgroundLocationService extends Service {
 
 
         public ApiConnector() {
-          /*  if (MainActivity.client == null) {
-                MainActivity.client = new GoogleApiClient.Builder(getApplicationContext())
-                        .addConnectionCallbacks(this)
-                        .addOnConnectionFailedListener(this)
-                        .addApi(LocationServices.API)
-                        .build();
-                MainActivity.client.connect();
-            }*/
         }
 
         @Override
