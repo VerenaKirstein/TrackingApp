@@ -19,30 +19,26 @@ public class UserCredentials {
 
 
     public UserCredentials(Context context) {
-
-        this.sharedPref = context.getSharedPreferences(Constants.PREFS_NAME, context.MODE_PRIVATE);
-        updateUserCredentialsFromSharedPreferences();
+        this.sharedPref = context.getSharedPreferences(
+                Constants.PREFS_NAME, context.MODE_PRIVATE);
+        updateFromSharedPreferences();
     }
 
 
-    public void updateUserCredentialsFromSharedPreferences() {
-
+    public void updateFromSharedPreferences() {
         this.userid = sharedPref.getString("UserID", "null");
         this.username = sharedPref.getString("Username", "null");
         this.age = sharedPref.getString("Age", "null");
         this.sex = sharedPref.getString("Sex", "null");
         this.profession = sharedPref.getString("Profession", "null");
         this.vehicle = sharedPref.getString("Vehicle", "null");
-
     }
 
 
-    public void setUserCredentialsToSharedPreferences(String variable, String value) {
-
+    public void setToSharedPreferences(String variable, String value) {
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putString(variable, value);
         editor.apply();
-
     }
 
     public String getUserid() {
@@ -50,7 +46,7 @@ public class UserCredentials {
     }
 
     public void setUserid(String userid) {
-        setUserCredentialsToSharedPreferences("UserID", userid);
+        setToSharedPreferences("UserID", userid);
         this.userid = userid;
     }
 
@@ -59,7 +55,7 @@ public class UserCredentials {
     }
 
     public void setUsername(String username) {
-        setUserCredentialsToSharedPreferences("Username", username);
+        setToSharedPreferences("Username", username);
         this.username = username;
     }
 
@@ -68,7 +64,7 @@ public class UserCredentials {
     }
 
     public void setAge(String age) {
-        setUserCredentialsToSharedPreferences("Age", age);
+        setToSharedPreferences("Age", age);
         this.age = age;
     }
 
@@ -77,7 +73,7 @@ public class UserCredentials {
     }
 
     public void setSex(String sex) {
-        setUserCredentialsToSharedPreferences("Sex", sex);
+        setToSharedPreferences("Sex", sex);
         this.sex = sex;
     }
 
@@ -86,7 +82,7 @@ public class UserCredentials {
     }
 
     public void setProfession(String profession) {
-        setUserCredentialsToSharedPreferences("Profession", profession);
+        setToSharedPreferences("Profession", profession);
         this.profession = profession;
     }
 
@@ -95,8 +91,7 @@ public class UserCredentials {
     }
 
     public void setVehicle(String vehicle) {
-        setUserCredentialsToSharedPreferences("Vehicle", vehicle);
-        setUserCredentialsToSharedPreferences("Vehicle", vehicle);
+        setToSharedPreferences("Vehicle", vehicle);
         this.vehicle = vehicle;
     }
 

@@ -12,7 +12,7 @@
 
     <string name="action_location_found">GPS</string>
     <string name="action_activity_found">Activity found</string>
-    <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdbnew</string>
+    <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdb</string>
     <string name="config.geodatabase.name">mma.bo</string>
     <string name="config.local.basemap">SanFrancisco.tpk</string>
 
