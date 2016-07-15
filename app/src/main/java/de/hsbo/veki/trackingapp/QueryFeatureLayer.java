@@ -15,6 +15,12 @@ import com.esri.core.tasks.query.QueryTask;
 public class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
 
 
+    /**
+     * Method to receive current features from feature service
+     *
+     * @param params - query parameter
+     * @return - features
+     */
         @Override
         protected FeatureResult doInBackground(String... params) {
 
@@ -40,6 +46,11 @@ public class QueryFeatureLayer extends AsyncTask<String, Void, FeatureResult> {
             return null;
         }
 
+    /**
+     * Method to add features to graphic layer
+     *
+     * @param results - features from feature service
+     */
         @Override
         protected void onPostExecute(FeatureResult results) {
 

@@ -2,14 +2,10 @@ package de.hsbo.veki.trackingapp;
 
 import com.google.android.gms.location.DetectedActivity;
 
-/**
- * Created by Verena Rabea on 11.06.2016.
- */
+
 public final class Constants {
 
-    private Constants() {
-    }
-
+    // Attributes
     public static final String PACKAGE_NAME = "de.hsbo.veki.trackingapp.activityrecognition";
     public static final String BROADCAST_ACTION = PACKAGE_NAME + ".BROADCAST_ACTION";
     public static final String ACTIVITY_EXTRA = PACKAGE_NAME + ".ACTIVITY_EXTRA";
@@ -35,7 +31,5 @@ public final class Constants {
             DetectedActivity.TILTING,
             DetectedActivity.UNKNOWN
     };
-
-
 
 }

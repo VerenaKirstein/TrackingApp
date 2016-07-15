@@ -13,19 +13,20 @@ import android.widget.Toast;
 
 public class ChangeUsernameActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
 
+    // Attributes for UI
     private Button btn_save;
     private Button btn_abort;
     private EditText etext_username;
     private EditText etext_age;
     private Spinner spinner_sex;
     private EditText etext_profession;
-
     private String spinner_sex_item = null;
     private String username_item = null;
     private String age_item = null;
     private String profession_item = null;
     private Integer user_id_item = null;
 
+    // Attribute to receive user credentials
     private Intent main_activity__user_intent = null;
 
 
@@ -34,15 +35,13 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_change_username_layout);
 
-
-
+        // initialize UI
         btn_save = (Button) findViewById(R.id.btn_save_username);
         btn_abort = (Button) findViewById(R.id.btn_abort_username);
         etext_username = (EditText) findViewById(R.id.editText_username);
         etext_age = (EditText) findViewById(R.id.editText_age);
         etext_profession = (EditText) findViewById(R.id.editText_profession);
         spinner_sex = (Spinner) findViewById(R.id.spinner_sex);
-
 
         // Create an ArrayAdapter using the string array and a default spinner layout
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
@@ -53,7 +52,7 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
         spinner_sex.setAdapter(adapter);
         //spinner_sex.setSelection(0);
 
-
+        // save attributes
         btn_save.setOnClickListener(new View.OnClickListener() {
 
             @Override
@@ -68,13 +67,14 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
                 // Create UserID from input parameters
                 user_id_item = (username_item + age_item + profession_item + spinner_sex_item).hashCode();
 
+                // all attributes must set
                 if (!username_item.isEmpty() && !age_item.isEmpty() && !profession_item.isEmpty()) {
 
-
+                    // age must between 0 and 100
                     if (Integer.parseInt(age_item) > 0 && Integer.parseInt(age_item) < 100) {
 
+                        // add attributes to intent
                         main_activity__user_intent = new Intent();
-
                         main_activity__user_intent.putExtra("Username", username_item);
                         main_activity__user_intent.putExtra("UserID", String.valueOf(user_id_item));
                         main_activity__user_intent.putExtra("Age", age_item);
@@ -97,6 +97,7 @@ public class ChangeUsernameActivity extends AppCompatActivity implements Adapter
             }
         });
 
+        // abort attributes
         btn_abort.setOnClickListener(new View.OnClickListener() {
 
             @Override

@@ -1,10 +1,7 @@
 package de.hsbo.veki.trackingapp;
 
-import android.app.ProgressDialog;
 import android.util.Log;
 
-import com.esri.android.map.Callout;
-import com.esri.android.map.FeatureLayer;
 import com.esri.android.map.MapView;
 import com.esri.core.ags.FeatureServiceInfo;
 import com.esri.core.geodatabase.Geodatabase;
@@ -27,62 +24,55 @@ import java.util.Map;
 
 public class LocalGeodatabase {
 
-    private static String filePath;
-    private String featureServiceUrl;
-    private static GeodatabaseSyncTask gdbSyncTask;
+    // Attributes for Local Filegeodatabase
+    private String filePath;
     private Geodatabase geodatabase = null;
-    public static ProgressDialog mProgressDialog;
-
-    public GeodatabaseFeatureTable getGeodatabaseFeatureTable() {
-        return geodatabaseFeatureTable;
-    }
-
     private GeodatabaseFeatureTable geodatabaseFeatureTable;
-    private FeatureLayer offlineFeatureLayer;
-    private static Callout callout;
-    private static MainActivity mainActivity;
-    private static MapView map;
+
+    private GeodatabaseSyncTask gdbSyncTask;
+    private MainActivity mainActivity;
+    private MapView map;
 
 
-    public MainActivity getMainActivity() {
-        return mainActivity;
-    }
+    /**
+     * Constructor LocalFilegeodatabase
+     *
+     * @param filePath          - local path to the filegeodatbase on device
+     * @param featureServiceUrl - featureServiceUrl to fetch
+     * @param mainActivity      - mainActivity to show progressbar
+     * @param map               - map to add layer
+     * @throws FileNotFoundException
+     */
 
     public LocalGeodatabase(String filePath, String featureServiceUrl, MainActivity mainActivity, MapView map) throws FileNotFoundException {
+
         this.filePath = filePath;
-        this.featureServiceUrl = featureServiceUrl;
         this.mainActivity = mainActivity;
         this.map = map;
+        this.gdbSyncTask = new GeodatabaseSyncTask(featureServiceUrl, null);
 
         // Check for Filegeodatabase
         File f = new File(filePath);
 
-        gdbSyncTask = new GeodatabaseSyncTask(featureServiceUrl, null);
-
-        // Create filegeodatabase if no exists
+        // check filegeodatabasefile -> if no exists
         if (!f.exists()) {
 
-            Log.e("File", ""+f.exists()+ " "+ featureServiceUrl);
+            Log.i("File", "" + f.exists() + " " + featureServiceUrl);
 
-            //MainActivity.progressDialog.setTitle("Create local runtime geodatabase");
+            // create new filegeodatabase
             createFilegeodatabase();
+        } else {
 
+            initializeDatabase();
 
         }
 
-        geodatabase = new Geodatabase(filePath);
-        //create a feature layer and add it to the map
-        geodatabaseFeatureTable = geodatabase.getGeodatabaseFeatureTableByLayerId(0);
-        //create a feature layer and add it to the map
-        offlineFeatureLayer = new FeatureLayer(geodatabaseFeatureTable);
-
 
     }
 
-    public FeatureLayer getOfflineFeatureLayer() {
-        return offlineFeatureLayer;
-    }
-
+    /**
+     * Method to initialize create Filegeodatabase
+     */
     private synchronized void createFilegeodatabase() {
 
         Log.i("createFilegeodatabase", "Create GeoDatabase");
@@ -92,7 +82,6 @@ public class LocalGeodatabase {
         MainActivity.progressDialog.show();
 
         // create the GeodatabaseTask
-
         Log.i("gdbSyncTask", gdbSyncTask.toString());
         gdbSyncTask.fetchFeatureServiceInfo(new CallbackListener<FeatureServiceInfo>() {
 
@@ -114,10 +103,36 @@ public class LocalGeodatabase {
 
     }
 
-
-    public void addFeature(Map attr, Point p) throws Exception {
+    /**
+     * Method to load geodatabase
+     */
+    private void initializeDatabase() {
 
         try {
+            // initialize geodatabase
+            geodatabase = new Geodatabase(filePath);
+            // create a feature layer
+            geodatabaseFeatureTable = geodatabase.getGeodatabaseFeatureTableByLayerId(0);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    /**
+     * Method to add new features to the Filegeodatabase
+     *
+     * @param attr - feature attributes
+     * @param p    - location
+     * @throws Exception
+     */
+    public void addFeature(Map<String, Object> attr, Point p) throws Exception {
+
+        try {
+
+            if (geodatabaseFeatureTable == null)
+                initializeDatabase();
+
             //Create a feature with these attributes at the given point
             GeodatabaseFeature gdbFeature = new GeodatabaseFeature(attr, p, geodatabaseFeatureTable);
 
@@ -146,7 +161,6 @@ public class LocalGeodatabase {
         Log.i(MainActivity.TAG, "Sync geodatabase from " + this.filePath);
         SyncGeodatabaseParameters params = geodatabase.getSyncParameters();
 
-
         CallbackListener<Map<Integer, GeodatabaseFeatureTableEditErrors>> callback = new CallbackListener<Map<Integer, GeodatabaseFeatureTableEditErrors>>() {
             @Override
             public void onCallback(final Map<Integer, GeodatabaseFeatureTableEditErrors> paramT) {
@@ -165,6 +179,7 @@ public class LocalGeodatabase {
                 String sucessState = status.getStatus().toString();
                 Log.i(MainActivity.TAG, sucessState);
 
+                // load current query feature layer
                 if (sucessState.equals("Completed")) {
                     Log.i(MainActivity.TAG, status.getStatus().toString());
                     mainActivity.showToast("Syncronisation abgeschlossen");
@@ -179,8 +194,12 @@ public class LocalGeodatabase {
 
     }
 
-
-    private static synchronized void createGeodatabase(FeatureServiceInfo featureServerInfo) {
+    /**
+     * Method to create local Filegeodatabase
+     *
+     * @param featureServerInfo - feature service attributes
+     */
+    private synchronized void createGeodatabase(FeatureServiceInfo featureServerInfo) {
         // set up the parameters to generate a geodatabase
         GenerateGeodatabaseParameters params = new GenerateGeodatabaseParameters(
                 featureServerInfo, map.getExtent(),
@@ -201,8 +220,6 @@ public class LocalGeodatabase {
             public void onCallback(String path) {
                 Log.i(MainActivity.TAG, "Geodatabase is: " + path);
                 MainActivity.progressDialog.dismiss();
-                // update map with local feature layer from geodatabase
-                updateFeatureLayer(path);
                 // log the path to the data on device
                 Log.i(MainActivity.TAG, "path to geodatabase: " + path);
             }
@@ -216,26 +233,22 @@ public class LocalGeodatabase {
 
                 Log.e("status", status.getStatus().toString());
                 String progress = status.getStatus().toString();
-                // get activity context
-                //Context context = mainActivity.getApplicationContext();
-                // create activity from context
-                //MainActivity activity = (MainActivity) context;
-                // update progress bar on main thread
                 showProgressBar(mainActivity, progress);
 
-                String sucessState = status.getStatus().toString();
+                //String sucessState = status.getStatus().toString();
 
-                if (sucessState.equals("Completed")) {
-                    map.getLayer(1).setVisible(false);
+                if (status.getStatus() == GeodatabaseStatusInfo.Status.COMPLETED) {
                     mainActivity.updateQueryFeatureLayer();
-                    Log.e("DB da", sucessState + map.getLayers().toString());
+
+
                 }
 
+                /*if (sucessState.equals("Completed")) {
+                    mainActivity.updateQueryFeatureLayer();
+                }*/
 
             }
         };
-
-
 
         // get geodatabase based on params
         submitTask(params, filePath, statusCallback,
@@ -246,40 +259,25 @@ public class LocalGeodatabase {
     /**
      * Request database, poll server to get status, and download the file
      */
-    private static synchronized void submitTask(GenerateGeodatabaseParameters params,
-                                                String file, GeodatabaseStatusCallback statusCallback,
-                                                CallbackListener<String> gdbResponseCallback) {
+    private synchronized void submitTask(GenerateGeodatabaseParameters params,
+                                         String file, GeodatabaseStatusCallback statusCallback,
+                                         CallbackListener<String> gdbResponseCallback) {
         // submit task
         gdbSyncTask.generateGeodatabase(params, file, false, statusCallback,
                 gdbResponseCallback);
+
+        initializeDatabase();
+
     }
 
 
-    private static void updateFeatureLayer(String featureLayerPath) {
-        // create a new geodatabase
-        com.esri.core.geodatabase.Geodatabase localGdb = null;
-        try {
-            localGdb = new com.esri.core.geodatabase.Geodatabase(featureLayerPath);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        // Geodatabase contains GdbFeatureTables representing attribute data
-        // and/or spatial data. If GdbFeatureTable has geometry add it to
-        // the MapView as a Feature Layer
-        if (localGdb != null) {
-            for (GeodatabaseFeatureTable gdbFeatureTable : localGdb
-                    .getGeodatabaseTables()) {
-                if (gdbFeatureTable.hasGeometry()) {
-                    MainActivity.mapView.addLayer(new FeatureLayer(gdbFeatureTable));
-
-                }
-            }
-        }
-    }
-
-
-    protected static void showProgressBar(final MainActivity activity, final String message) {
+    /**
+     * Show progress bar
+     *
+     * @param activity - MainActivity to show
+     * @param message  - shown text
+     */
+    protected void showProgressBar(final MainActivity activity, final String message) {
         activity.runOnUiThread(new Runnable() {
 
             @Override
@@ -289,4 +287,12 @@ public class LocalGeodatabase {
 
         });
     }
+
+    /**
+     * Getter methods
+     */
+    public GeodatabaseFeatureTable getGeodatabaseFeatureTable() {
+        return geodatabaseFeatureTable;
+    }
+
 }

@@ -14,7 +14,7 @@
     <string name="action_activity_found">Activity found</string>
     <string name="config.data.sdcard.offline.dir">ArcGIS/TrackingApp/CRGdb</string>
     <string name="config.geodatabase.name">mma.bo</string>
-    <string name="config.local.basemap">SanFrancisco.tpk</string>
+    <string name="OFFLINE_FILE_EXTENSION">.geodatabase</string>
 
     <string name="FeatureLayerURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingApp/FeatureServer/0</string>
     <string name="FeatureServiceURL">http://services6.arcgis.com/TnkL2ImtItc6HyO9/arcgis/rest/services/TrackingApp/FeatureServer</string>

@@ -8,6 +8,7 @@ import android.content.SharedPreferences;
  */
 public class UserCredentials {
 
+    // Attributes
     private String userid;
     private String username;
     private String age;
@@ -17,14 +18,20 @@ public class UserCredentials {
 
     private SharedPreferences sharedPref;
 
-
+    /**
+     * Constructor UserCredentials
+     *
+     * @param context - context from MainActivity
+     */
     public UserCredentials(Context context) {
         this.sharedPref = context.getSharedPreferences(
-                Constants.PREFS_NAME, context.MODE_PRIVATE);
+                Constants.PREFS_NAME, Context.MODE_PRIVATE);
         updateFromSharedPreferences();
     }
 
-
+    /**
+     * Method to get all attributes from sharedPreferences
+     */
     public void updateFromSharedPreferences() {
         this.userid = sharedPref.getString("UserID", "null");
         this.username = sharedPref.getString("Username", "null");
@@ -34,17 +41,30 @@ public class UserCredentials {
         this.vehicle = sharedPref.getString("Vehicle", "null");
     }
 
-
+    /**
+     * Method to set attributes to sharedPreferences
+     *
+     * @param variable - attribute to set
+     * @param value    - value to set
+     */
     public void setToSharedPreferences(String variable, String value) {
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putString(variable, value);
         editor.apply();
     }
 
+    /**
+     * Getter methods
+     * @return - attribute
+     */
     public String getUserid() {
         return userid;
     }
 
+    /**
+     * Setter methods
+     * @param userid - value to set
+     */
     public void setUserid(String userid) {
         setToSharedPreferences("UserID", userid);
         this.userid = userid;
@@ -95,6 +115,10 @@ public class UserCredentials {
         this.vehicle = vehicle;
     }
 
+    /**
+     * toString method
+     * @return - string of all attributes
+     */
     @Override
     public String toString() {
         return "UserCredentials{" +

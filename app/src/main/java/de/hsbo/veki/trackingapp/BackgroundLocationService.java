@@ -2,8 +2,6 @@ package de.hsbo.veki.trackingapp;
 
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -27,59 +25,64 @@ import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.Result;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.ActivityRecognition;
-import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResult;
 
-import java.util.ArrayList;
 
-/**
- * Created by Thorsten Kelm on 19.06.2016.
- */
 public class BackgroundLocationService extends Service {
-    //public GoogleApiClient mGoogleApiClient= null;
+
+    public static final String BROADCAST_ACTION = "de.hsbo.veki.trackingapp.BROADCAST";
+    public static final String EXTENDED_DATA_STATUS = "de.hsbo.veki.trackingapp.STATUS";
+    public final IBinder binder = new LocalBinder();
+    // Attributes
     public Location mLastLocation;
     ApiConnector connector;
     HandlerThread handlerThread;
 
-    public final IBinder binder = new LocalBinder();
-
-    public static final String BROADCAST_ACTION = "de.hsbo.veki.trackingapp.BROADCAST";
-    public static final String EXTENDED_DATA_STATUS = "de.hsbo.veki.trackingapp.STATUS";
-
+    /**
+     * Method to unbind background service from activity
+     */
     @Override
     public boolean onUnbind(Intent intent) {
         Log.i("Background","Unbind");
         connector.removeActivityUpdates();
         return super.onUnbind(intent);
     }
+
+    /**
+     * Method to start background service
+     */
     @Override
     public synchronized void onCreate() {
 
         handlerThread = new HandlerThread("Service", Process.THREAD_PRIORITY_BACKGROUND);
         handlerThread.start();
 
-
     }
 
 
+    /**
+     * Method to start ApiConnector
+     */
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+
         int updateInterval = intent.getIntExtra("Update_Interval",15000);
         connector = new ApiConnector();
         Log.i("Interval", " " +updateInterval);
         connector.changeLocationRequestInterval(updateInterval);
 
-
         return START_REDELIVER_INTENT;
     }
 
+    /**
+     * Method to stop ApiConnector and background service
+     */
     @Override
     public void onDestroy() {
-
 
         super.onDestroy();
         Log.i("TAG", "ON DESTROY");
@@ -89,16 +92,14 @@ public class BackgroundLocationService extends Service {
     }
 
 
-
     @Override
     public IBinder onBind(Intent intent) {
-
-          //  connector.requestActivityUpdates();
-
         return binder;
     }
 
-
+    /**
+     * Inner Class to define local binder
+     */
     public class LocalBinder extends Binder {
 
         public BackgroundLocationService getService() {
@@ -106,6 +107,9 @@ public class BackgroundLocationService extends Service {
         }
     }
 
+    /**
+     * Inner Class to define ApiConnector to use Google Location API
+     */
     public class ApiConnector implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener,ResultCallback {
 
         private LocationManager locationManager1;

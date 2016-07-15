@@ -2,9 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/TrackingApp.iml" filepath="$PROJECT_DIR$/TrackingApp.iml" />
-      <module fileurl="file://$PROJECT_DIR$/TrackingApp2.iml" filepath="$PROJECT_DIR$/TrackingApp2.iml" />
-      <module fileurl="file://$PROJECT_DIR$/TrackingAppNew.iml" filepath="$PROJECT_DIR$/TrackingAppNew.iml" />
+      <module fileurl="file://$PROJECT_DIR$/TrackingAppnew.iml" filepath="$PROJECT_DIR$/TrackingAppnew.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>

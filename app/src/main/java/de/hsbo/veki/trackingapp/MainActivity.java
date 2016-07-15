@@ -16,8 +16,6 @@ import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
-import android.provider.Settings;
-import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -37,17 +35,17 @@ import com.esri.android.map.FeatureLayer;
 import com.esri.android.map.GraphicsLayer;
 import com.esri.android.map.MapView;
 import com.esri.android.map.event.OnSingleTapListener;
+import com.esri.core.geodatabase.GeodatabaseFeatureServiceTable;
 import com.esri.core.geometry.GeometryEngine;
 import com.esri.core.geometry.Point;
 import com.esri.core.geometry.SpatialReference;
+import com.esri.core.map.CallbackListener;
 import com.esri.core.map.Feature;
 import com.esri.core.map.Graphic;
 import com.esri.core.symbol.SimpleMarkerSymbol;
 import com.esri.core.table.TableException;
 import com.esri.core.tasks.geodatabase.GeodatabaseSyncTask;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.Result;
-import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationRequest;
 
@@ -68,30 +66,27 @@ public class MainActivity extends AppCompatActivity {
     // Attributes for Application
     public static String TAG = "MainActivity";
     public static ProgressDialog progressDialog;
+    public static GoogleApiClient client;
+    public static LocationRequest mLocationRequest;
+    protected static String featureLayerURL;
+    protected static GraphicsLayer graphicsLayer;
     private static Context context;
-
-
     // Attributes for LocalFilegeodatabase
     private GeodatabaseSyncTask gdbSyncTask;
     private File demoDataFile;
     private String offlineDataSDCardDirName;
     private String filename;
-    private String OFFLINE_FILE_EXTENSION = ".geodatabase";
+    private String OFFLINE_FILE_EXTENSION;
     private Callout callout;
     private LocalGeodatabase localGeodatabase;
-    private String username;
-
+    private GeodatabaseFeatureServiceTable featureServiceTable;
+    private FeatureLayer fLayer;
     private String user_id = null;
-
-
+    private DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.MEDIUM);
+    private String newLocationTime;
     // Attributes for the Map
-    public static MapView mapView;
-    static String featureLayerURL;
-    public static String featureServiceURL;
-    static GraphicsLayer graphicsLayer;
-    private FeatureLayer offlineFeatureLayer;
-
-
+    private MapView mapView;
+    private String featureServiceURL;
     // Attributes for UserInterface
     private TextView latitudeText;
     private TextView longitudeText;
@@ -102,29 +97,48 @@ public class MainActivity extends AppCompatActivity {
     private MenuItem pedestrianCheckbox = null;
     private MenuItem bicycleCheckbox = null;
     private MenuItem autoCheckbox = null;
-    public static Integer gpsInterval = 15000;
-    private Intent username_intent;
+    private Integer gpsInterval = 15000;
     private UserCredentials userCredentials;
-
-
     // Attributes for BackgroundService
     private Intent intent;
     private GPSBroadcastReceiver gpsBroadcastReceiver;
     private BackgroundLocationService mService;
-    public static GoogleApiClient client;
-    public static LocationRequest mLocationRequest;
     private Boolean mBound = false;
+    /**
+     * Initialize server connection
+     */
+    protected ServiceConnection mServerConn = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+
+            BackgroundLocationService.LocalBinder binder = (BackgroundLocationService.LocalBinder) service;
+            mService = binder.getService();
+            mBound = true;
+        }
+
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.d("TAG", "onServiceDisconnected");
+        }
+    };
     private Point newLocation;
     private Point oldLocation = null;
     private ActivityDetectionBroadcastReceiver mBroadcastReceiver;
     private ArrayList<DetectedActivity> mDetectedActivities;
 
+    public static Context getContext() {
+        return context;
+    }
+
+    public static void setContext(Context mainContext) {
+        MainActivity.context = mainContext;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         MainActivity.setContext(this);
@@ -134,6 +148,7 @@ public class MainActivity extends AppCompatActivity {
         demoDataFile = Environment.getExternalStorageDirectory();
         offlineDataSDCardDirName = this.getResources().getString(R.string.config_data_sdcard_offline_dir);
         filename = this.getResources().getString(R.string.config_geodatabase_name);
+        OFFLINE_FILE_EXTENSION = this.getResources().getString(R.string.OFFLINE_FILE_EXTENSION);
 
         // Load UserInterface-Elements
         latitudeText = (TextView) findViewById(R.id.GPSLatText);
@@ -141,8 +156,7 @@ public class MainActivity extends AppCompatActivity {
         bewGeschw = (TextView) findViewById(R.id.BwGeschw);
         syncButton = (Button) findViewById(R.id.syncButton);
 
-
-        // Read Username from Device
+        // Read user credentials from device
         userCredentials = new UserCredentials(getContext());
 
         // No User? Show alert to get User information
@@ -152,11 +166,9 @@ public class MainActivity extends AppCompatActivity {
 
         Log.i("userCredentials", userCredentials.getProfession());
 
-
         // Get FeatureURL
         featureServiceURL = this.getResources().getString(R.string.FeatureServiceURL);
         featureLayerURL = this.getResources().getString(R.string.FeatureLayerURL);
-
 
         // Initialize Map
         mapView = (MapView) findViewById(R.id.map);
@@ -171,19 +183,94 @@ public class MainActivity extends AppCompatActivity {
         try {
 
             if (networkInfo != null && networkInfo.isConnected()) {
-                Log.i(TAG," set local Geodatabase");
+                Log.i(TAG, " set local Geodatabase");
                 localGeodatabase = new LocalGeodatabase(createGeodatabaseFilePath(), featureServiceURL, getMainActivity(), mapView);
-                offlineFeatureLayer = localGeodatabase.getOfflineFeatureLayer();
 
-                Log.i(TAG,"  local Geodatabase");
-                mapView.addLayer(offlineFeatureLayer);
-                mapView.getLayer(2).setVisible(false);
+                // Get featureServiceTable from feature service
+                featureServiceTable = new GeodatabaseFeatureServiceTable(featureServiceURL, 0);
+
+                // initialize the table asynchronously
+                featureServiceTable.initialize(
+                        new CallbackListener<GeodatabaseFeatureServiceTable.Status>() {
+
+                            @Override
+                            public void onError(Throwable e) {
+                                // report/handle error as desired
+                                Log.i(TAG, featureServiceTable.getInitializationError());
+                            }
+
+                            @Override
+                            public void onCallback(GeodatabaseFeatureServiceTable.Status status) {
+
+                                // if featureServiceTable is initialized
+                                if (status == GeodatabaseFeatureServiceTable.Status.INITIALIZED) {
+
+                                    // add featurelayer to map
+                                    fLayer = new FeatureLayer(featureServiceTable);
+                                    mapView.addLayer(fLayer);
+
+                                    // add single tab listener
+                                    mapView.setOnSingleTapListener(new OnSingleTapListener() {
+
+                                        @Override
+                                        public void onSingleTap(float x, float y) {
+
+                                            // if user_id is set
+                                            if (user_id.equals("null")) {
+
+                                                long[] selectedFeatures = fLayer.getFeatureIDs(x, y, 25, 1);
+
+                                                if (selectedFeatures.length > 0) {
+
+                                                    // Feature is selected
+                                                    fLayer.selectFeatures(selectedFeatures, false);
+
+                                                    // Get Feature attributes
+                                                    Feature feature = fLayer.getFeature(selectedFeatures[0]);
+                                                    String featureUser_ID = feature.getAttributeValue("UserID").toString();
+                                                    String featureUsername = feature.getAttributeValue("Username").toString();
+                                                    String featureVehicle = feature.getAttributeValue("Vehicle").toString();
+                                                    String featureTime = feature.getAttributeValue("Time").toString();
+
+                                                    Log.e("Feature selected", "" + feature.getAttributes());
+
+                                                    // Show information if user is owner of the point
+                                                    if (user_id.equals(featureUser_ID)) {
+                                                        callout = mapView.getCallout();
+                                                        callout.setStyle(R.xml.tracked_point);
+                                                        callout.setContent(loadView(featureUser_ID, featureUsername, featureVehicle, featureTime));
+                                                        callout.show((Point) feature.getGeometry());
+                                                    } else {
+                                                        if (callout != null && callout.isShowing()) {
+                                                            callout.hide();
+                                                        }
+                                                    }
+
+                                                } else {
+                                                    if (callout != null && callout.isShowing()) {
+                                                        callout.hide();
+
+                                                    }
+                                                }
+
+                                                fLayer.clearSelection();
+                                            }
+                                        }
+
+                                    });
+                                }
+                            }
+                        });
+
 
                 // Create a personal FeatureLayer and add to map
                 user_id = userCredentials.getUserid();
 
-                // Load FeatureLayer for user_id
-                new QueryFeatureLayer().execute(user_id);
+                if (user_id.equals("null")) {
+                    // Load FeatureLayer for user_id
+                    new QueryFeatureLayer().execute(user_id);
+                }
+
 
             } else {
 
@@ -197,59 +284,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        mapView.setOnSingleTapListener(new OnSingleTapListener() {
-
-            @Override
-            public void onSingleTap(float x, float y) {
-
-                if (user_id != "null") {
-
-                    long[] selectedFeatures = offlineFeatureLayer.getFeatureIDs(x, y, 25, 1);
-
-                    if (selectedFeatures.length > 0) {
-
-                        // Feature is selected
-                        offlineFeatureLayer.selectFeatures(selectedFeatures, false);
-
-                        // Get Feature attributes
-                        Feature feature = offlineFeatureLayer.getFeature(selectedFeatures[0]);
-                        String featureUser_ID = feature.getAttributeValue("UserID").toString();
-                        String featureUsername = feature.getAttributeValue("Username").toString();
-                        String featureVehicle = feature.getAttributeValue("Vehicle").toString();
-                        String featureTime = feature.getAttributeValue("Time").toString();
-
-                        // Show information if user is owner of the point
-                        if (user_id.equals(featureUser_ID)) {
-                            callout = mapView.getCallout();
-                            callout.setStyle(R.xml.tracked_point);
-                            callout.setContent(loadView(featureUser_ID, featureUsername, featureVehicle, featureTime));
-                            callout.show((Point) feature.getGeometry());
-                        } else {
-                            if (callout != null && callout.isShowing()) {
-                                callout.hide();
-                            }
-                        }
-
-                    } else {
-                        if (callout != null && callout.isShowing()) {
-                            callout.hide();
-
-                        }
-                    }
-
-                    offlineFeatureLayer.clearSelection();
-                }
-            }
-
-        });
-
-
         // Initialize background service
         intent = new Intent(this, BackgroundLocationService.class);
-        IntentFilter intentFilter = new IntentFilter("android.intent.action.MAIN");
-
-//        // Initialize Userinput Inent
-//        username_intent = new Intent(this, ChangeUsernameActivity.class);
+        //IntentFilter intentFilter = new IntentFilter("android.intent.action.MAIN");
 
         gpsBroadcastReceiver = new GPSBroadcastReceiver();
         mBroadcastReceiver = new ActivityDetectionBroadcastReceiver();
@@ -262,6 +299,7 @@ public class MainActivity extends AppCompatActivity {
             mDetectedActivities.add(new DetectedActivity(Constants.MONITORED_ACTIVITIES[i], 0));
         }
 
+        // if service is running in background -> bind to activity
         if (isMyServiceRunning(BackgroundLocationService.class)) {
 
             bindService(intent, mServerConn, Context.BIND_AUTO_CREATE);
@@ -269,10 +307,10 @@ public class MainActivity extends AppCompatActivity {
 
         }
 
-
-            syncButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
+        // start sync
+        syncButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
 
                 Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
                 try {
@@ -283,21 +321,11 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
 
-
             }
         });
 
 
-
     }
-    public static void setContext(Context mainContext) {
-        MainActivity.context = mainContext;
-    }
-
-    public static Context getContext() {
-        return context;
-    }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -311,6 +339,7 @@ public class MainActivity extends AppCompatActivity {
         bicycleCheckbox = menu.getItem(3).getSubMenu().getItem(2);
         carCheckbox = menu.getItem(3).getSubMenu().getItem(3);
 
+        // check background service for chosen image
         if (isMyServiceRunning(BackgroundLocationService.class)) {
             menu.getItem(1).setChecked(false).setIcon(R.drawable.gps_on_highres);
             menu.getItem(0).setVisible(true);
@@ -329,14 +358,16 @@ public class MainActivity extends AppCompatActivity {
                 autoCheckbox.setChecked(true);
             default:
                 autoCheckbox.setChecked(true);
-                userCredentials.setVehicle("Automatisch erkennen");
+                userCredentials.setVehicle("Unkown");
         }
 
         return true;
 
     }
 
-
+    /**
+     * Method to unbind service before app is destroy
+     */
     @Override
     protected void onDestroy() {
 
@@ -345,18 +376,24 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-
+    /**
+     * Method to handle Action Overflow interaction
+     *
+     * @param item - selected option
+     */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
 
         switch (item.getItemId()) {
 
+            // Change username
             case R.id.action_username:
 
                 Intent interval_intent_username = new Intent(getApplicationContext(), ChangeUsernameActivity.class);
                 startActivityForResult(interval_intent_username, 200);
                 return true;
 
+            // Change intervall
             case R.id.action_interval:
 
                 if (mBound) {
@@ -370,6 +407,7 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult(interval_intent, 100);
                 return true;
 
+            // Start or stop tracking
             case R.id.action_location_found:
 
                 user_id = userCredentials.getUserid();
@@ -379,7 +417,7 @@ public class MainActivity extends AppCompatActivity {
                 if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
 
 
-                    if (user_id == "null") {
+                    if (user_id.equals("null")) {
 
                         alertMessageNoUser();
 
@@ -418,25 +456,28 @@ public class MainActivity extends AppCompatActivity {
                     alertMessageNoGps();
                 }
 
-
+                // Vehicle car selected
             case R.id.carMenuItem:
                 userCredentials.setVehicle("Car");
                 menu.getItem(0).setIcon(R.drawable.car);
                 carCheckbox.setChecked(true);
                 return true;
 
+            // Vehicle pedestrian selected
             case R.id.pedestrianMenuItem:
                 userCredentials.setVehicle("Walking");
                 menu.getItem(0).setIcon(R.drawable.walking);
                 pedestrianCheckbox.setChecked(true);
                 return true;
 
+            // Vehicle bicycle selected
             case R.id.bicycleMenuItem:
                 userCredentials.setVehicle("Bike");
                 menu.getItem(0).setIcon(R.drawable.bike);
                 bicycleCheckbox.setChecked(true);
                 return true;
 
+            // Vehicle "automatic" selected
             case R.id.auto:
                 userCredentials.setVehicle(mDetectedActivities.get(0).toString());
                 autoCheckbox.setChecked(true);
@@ -447,27 +488,6 @@ public class MainActivity extends AppCompatActivity {
 
         }
     }
-
-
-    protected ServiceConnection mServerConn = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-
-            BackgroundLocationService.LocalBinder binder = (BackgroundLocationService.LocalBinder) service;
-            mService = binder.getService();
-            mBound = true;
-        }
-
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            Log.d("TAG", "onServiceDisconnected");
-        }
-    };
-
-
-
-
 
     @Override
     protected void onResume() {
@@ -484,49 +504,44 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
     }
 
-
-    public class GPSBroadcastReceiver extends BroadcastReceiver {
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-
-            // Data you need to pass to activity
-            Log.i(TAG, "" + intent.getExtras().getDouble(BackgroundLocationService.EXTENDED_DATA_STATUS));
-            double lat = intent.getExtras().getDouble("Lat");
-            double lon = intent.getExtras().getDouble("Lon");
-
-            Log.e("onReceveive", "" + lat + " " + lon);
-            createPoint(lon, lat);
-        }
-    }
-
-
+    /**
+     * Method to create new point
+     *
+     * @param lon - longitude value
+     * @param lat - latitude value
+     */
     public void createPoint(double lon, double lat) {
 
+        // Save values as point
         Point wgsPoint = new Point(lon, lat);
 
         if (newLocation != null) {
             oldLocation = newLocation;
         }
 
+        // Project from WGS84 to map reference system
         newLocation = (Point) GeometryEngine.project(wgsPoint,
                 SpatialReference.create(4326),
                 mapView.getSpatialReference());
 
-        Log.e("newLoc", "" + newLocation.toString());
+        Log.i("newLoc", "" + newLocation.toString());
 
+        // Calculate and set speed
         if (oldLocation != null) {
             double distance = Math.sqrt(Math.pow(oldLocation.getX() - newLocation.getX(), 2) + Math.pow(oldLocation.getY() - newLocation.getY(), 2));
             double geschw = distance / (3.6);
             geschw = Math.round(geschw * 100) / 100.0;
-            bewGeschw.setText(roundValue(geschw, 1) + " m/s");
+            String bewGeschwText = roundValue(geschw, 1) + " m/s";
+            bewGeschw.setText(bewGeschwText);
         } else {
             bewGeschw.setText(valueOf(0.0 + " m/s"));
         }
 
+        // Round and set coordinates
         latitudeText.setText(roundValue(lat, 7));
         longitudeText.setText(roundValue(lon, 6));
 
+        // update graphic and add point to local Filegeodatabase
         if (newLocation != null) {
             updateGraphic(newLocation);
             Log.e("newLoc", newLocation.toString());
@@ -534,22 +549,28 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-
-
-
     }
 
+    /**
+     * Method to round double values
+     *
+     * @param value - number to round
+     * @param i     - decimal point number
+     * @return - rounded value
+     */
     public String roundValue(double value, int i) {
         return String.valueOf(new BigDecimal(value).round(new MathContext(i)));
     }
 
-
+    /**
+     * Method to prepare attributes of points to add into Filegeodatabase
+     * @param newLocation - tracked point
+     */
     private void addFeatureToLocalgeodatabase(Point newLocation) {
 
-        DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.MEDIUM);
-        String newLocationTime = dateFormat.format(Calendar.getInstance().getTime());
+        newLocationTime = dateFormat.format(Calendar.getInstance().getTime());
 
-        //make a map of attributes
+        // make a map of attributes
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("UserID", userCredentials.getUserid());
         attributes.put("Username", userCredentials.getUsername());
@@ -560,7 +581,8 @@ public class MainActivity extends AppCompatActivity {
         attributes.put("Time", newLocationTime);
         attributes.put("Speed", bewGeschw.getText().toString());
 
-        Log.e("attributes", attributes.toString());
+        Log.i("attributes", attributes.toString());
+        Log.i("loc", newLocation.toString());
 
         try {
             localGeodatabase.addFeature(attributes, newLocation);
@@ -568,6 +590,12 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
+    }
+
+    /**
+     * Method to log all features in Filegeodatabase
+     */
+    private void logFeaturesInDatabase() {
         // Log all Features in Database
         try {
             long size = localGeodatabase.getGeodatabaseFeatureTable().getNumberOfFeatures();
@@ -576,7 +604,7 @@ public class MainActivity extends AppCompatActivity {
 
             for (long k = 0; k <= size; k++) {
                 try {
-                    Log.e("Feature", "" + localGeodatabase.getGeodatabaseFeatureTable().getFeature(k));
+                    Log.i("Feature", "" + localGeodatabase.getGeodatabaseFeatureTable().getFeature(k));
                 } catch (TableException e) {
                     e.printStackTrace();
                 }
@@ -585,20 +613,24 @@ public class MainActivity extends AppCompatActivity {
         } catch (NullPointerException e) {
             e.getStackTrace();
         }
-
-
     }
 
+    /**
+     * Method to add point to graphics layer
+     * @param newLocation - tracked point
+     */
     private void updateGraphic(Point newLocation) {
 
         SimpleMarkerSymbol resultSymbolact = new SimpleMarkerSymbol(Color.RED, 16, SimpleMarkerSymbol.STYLE.CROSS);
         Graphic graphic = new Graphic(newLocation, resultSymbolact);
         graphicsLayer.addGraphic(graphic);
 
-
     }
 
-
+    /**
+     * Method to identify running services
+     * @param serviceClass - service class to check
+     */
     private boolean isMyServiceRunning(Class<?> serviceClass) {
 
         ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -613,11 +645,10 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-
     /*
     * Create the geodatabase file location and name structure
     */
-    public String createGeodatabaseFilePath() {
+    private String createGeodatabaseFilePath() {
         StringBuilder sb = new StringBuilder();
         sb.append(demoDataFile.getAbsolutePath());
         sb.append(File.separator);
@@ -626,16 +657,20 @@ public class MainActivity extends AppCompatActivity {
         sb.append(filename);
         sb.append(OFFLINE_FILE_EXTENSION);
 
-        Log.e("String", sb.toString());
         return sb.toString();
     }
 
+    /**
+     * Method to handle ActivityResults
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
 
         switch (resultCode) {
+
+            // set intervall
             case 100:
                 Log.i(TAG, "Result 100");
                 gpsInterval = data.getExtras().getInt("connected");
@@ -647,7 +682,7 @@ public class MainActivity extends AppCompatActivity {
                     startService(intent);
                 }
 
-
+                // set user credentials
             case 200:
 
                 if (data != null) {
@@ -672,7 +707,10 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-
+    /**
+     * Method to show toasts
+     * @param message - text to show
+     */
     public void showToast(final String message) {
         // Show toast message on the main thread only; this function can be
         // called from query callbacks that run on background threads.
@@ -684,7 +722,9 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-
+    /**
+     * Method to adjust onSingleTab result
+     */
     private View loadView(String id, String username, String vehicle, String time) {
         View view = LayoutInflater.from(MainActivity.this).inflate(R.layout.pointinfo, null);
         final TextView textNummer = (TextView) view.findViewById(R.id.popup);
@@ -696,13 +736,8 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * set the correct Item depending on the activity detected
-     *
-     * @param detectedActivities
-     * @return
      */
     public boolean setIconActivity(ArrayList<DetectedActivity> detectedActivities) {
-
-        //menu.getItem(0).setVisible(true);
 
         int confidenceLevel = 0;
         int number = 0;
@@ -766,30 +801,9 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-
-    public MainActivity getMainActivity() {
-        return this;
-    }
-
     /**
-     * BroadCast Receiver for the IntentService to receive the DetectedActivity
+     * Method to invite user to turn gps on
      */
-    public class ActivityDetectionBroadcastReceiver extends BroadcastReceiver {
-        protected static final String TAG = "activity-det-resp-rec";
-
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            ArrayList<DetectedActivity> updatedActivities =
-                    intent.getParcelableArrayListExtra(Constants.ACTIVITY_EXTRA);
-            Log.i(TAG, "Activity Received");
-            setIconActivity(updatedActivities);
-
-        }
-    }
-
-
-
     private void alertMessageNoGps() {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setMessage("Dein GPS ist ausgeschaltet, möchtest du es einschalten?")
@@ -808,7 +822,9 @@ public class MainActivity extends AppCompatActivity {
         alert.show();
     }
 
-
+    /**
+     * Method to invite user to set user credentials
+     */
     private void alertMessageNoUser() {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setMessage("Es wurden noch keine Benutzerdaten eingegeben, möchtest du das jetzt erledigen?")
@@ -830,10 +846,54 @@ public class MainActivity extends AppCompatActivity {
         alert.show();
     }
 
-
+    /**
+     * Method to initialize new QueryFeatureLayer
+     */
     public void updateQueryFeatureLayer() {
         String user_id = userCredentials.getUserid();
         new QueryFeatureLayer().execute(user_id);
+    }
+
+    /**
+     * Getter Method for MainActivity
+     */
+    public MainActivity getMainActivity() {
+        return this;
+    }
+
+    /**
+     * Inner Class to initialize GPSBroadcastReceiver
+     */
+    public class GPSBroadcastReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+            // Data you need to pass to activity
+            Log.i(TAG, "" + intent.getExtras().getDouble(BackgroundLocationService.EXTENDED_DATA_STATUS));
+            double lat = intent.getExtras().getDouble("Lat");
+            double lon = intent.getExtras().getDouble("Lon");
+
+            Log.e("onReceveive", "" + lat + " " + lon);
+            createPoint(lon, lat);
+        }
+    }
+
+    /**
+     * BroadCast Receiver for the IntentService to receive the DetectedActivity
+     */
+    public class ActivityDetectionBroadcastReceiver extends BroadcastReceiver {
+        protected static final String TAG = "activity-det-resp-rec";
+
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            ArrayList<DetectedActivity> updatedActivities =
+                    intent.getParcelableArrayListExtra(Constants.ACTIVITY_EXTRA);
+            Log.i(TAG, "Activity Received");
+            setIconActivity(updatedActivities);
+
+        }
     }
 }
 
