@@ -41,10 +41,12 @@ import com.esri.core.geometry.Point;
 import com.esri.core.geometry.SpatialReference;
 import com.esri.core.map.CallbackListener;
 import com.esri.core.map.Feature;
+import com.esri.core.map.FeatureResult;
 import com.esri.core.map.Graphic;
 import com.esri.core.symbol.SimpleMarkerSymbol;
 import com.esri.core.table.TableException;
 import com.esri.core.tasks.geodatabase.GeodatabaseSyncTask;
+import com.esri.core.tasks.query.QueryParameters;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.DetectedActivity;
 import com.google.android.gms.location.LocationRequest;
@@ -71,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
     protected static String featureLayerURL;
     protected static GraphicsLayer graphicsLayer;
     private static Context context;
+    private GraphicsLayer graphicsAttLayer;
     // Attributes for LocalFilegeodatabase
     private GeodatabaseSyncTask gdbSyncTask;
     private File demoDataFile;
@@ -87,6 +90,8 @@ public class MainActivity extends AppCompatActivity {
     // Attributes for the Map
     private MapView mapView;
     private String featureServiceURL;
+    private SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.RED, 10, SimpleMarkerSymbol.STYLE.CIRCLE);
+    private SimpleMarkerSymbol sms_dia = new SimpleMarkerSymbol(Color.GREEN, 10, SimpleMarkerSymbol.STYLE.DIAMOND);
     // Attributes for UserInterface
     private TextView latitudeText;
     private TextView longitudeText;
@@ -143,6 +148,7 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         MainActivity.setContext(this);
         progressDialog = new ProgressDialog(MainActivity.this);
+        callout = null;
 
         // Get resource names
         demoDataFile = Environment.getExternalStorageDirectory();
@@ -173,12 +179,17 @@ public class MainActivity extends AppCompatActivity {
         // Initialize Map
         mapView = (MapView) findViewById(R.id.map);
         graphicsLayer = new GraphicsLayer();
+        graphicsAttLayer = new GraphicsLayer();
+
         mapView.addLayer(graphicsLayer);
+        mapView.addLayer(graphicsAttLayer);
 
         // Get NetworkInfo
         ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
 
+        // Create a personal FeatureLayer and add to map
+        user_id = userCredentials.getUserid();
 
         try {
 
@@ -205,34 +216,52 @@ public class MainActivity extends AppCompatActivity {
                                 // if featureServiceTable is initialized
                                 if (status == GeodatabaseFeatureServiceTable.Status.INITIALIZED) {
 
-                                    // add featurelayer to map
+                                    Log.i(TAG, "GeodatabaseFeatureServiceTable INITIALIZED");
+
                                     fLayer = new FeatureLayer(featureServiceTable);
+                                    //fLayer.setRenderer(new SimpleRenderer(new SimpleMarkerSymbol(Color.BLUE, 2, SimpleMarkerSymbol.STYLE.CIRCLE)));
+
+                                    fLayer.setVisible(false);
                                     mapView.addLayer(fLayer);
+
+                                    addUserPointsToGraphic();
+
 
                                     // add single tab listener
                                     mapView.setOnSingleTapListener(new OnSingleTapListener() {
 
                                         @Override
-                                        public void onSingleTap(float x, float y) {
+                                        public void onSingleTap(final float x, final float y) {
 
                                             // if user_id is set
-                                            if (user_id.equals("null")) {
+                                            if (!user_id.equals("null")) {
 
-                                                long[] selectedFeatures = fLayer.getFeatureIDs(x, y, 25, 1);
+                                                // Get selected point
+                                                fLayer.clearSelection();
+                                                long[] selectedFeatures = fLayer.getFeatureIDs(x, y, 100, 1);
 
+                                                Log.i("Tab getFeatures", "" + fLayer.getFeatureIDs(x, y, 100, 1).length);
+
+                                                // If point was found, add to attribute graphic
                                                 if (selectedFeatures.length > 0) {
 
-                                                    // Feature is selected
-                                                    fLayer.selectFeatures(selectedFeatures, false);
+                                                    fLayer.selectFeature(selectedFeatures[0]);
+                                                    Feature feature = fLayer.getFeature(selectedFeatures[0]);
+
+
+                                                    // convert feature to graphic
+                                                    Graphic graphic = new Graphic(feature.getGeometry(), sms_dia, feature.getAttributes());
+
+                                                    // add it to the layer
+                                                    graphicsAttLayer.addGraphic(graphic);
 
                                                     // Get Feature attributes
-                                                    Feature feature = fLayer.getFeature(selectedFeatures[0]);
                                                     String featureUser_ID = feature.getAttributeValue("UserID").toString();
                                                     String featureUsername = feature.getAttributeValue("Username").toString();
                                                     String featureVehicle = feature.getAttributeValue("Vehicle").toString();
                                                     String featureTime = feature.getAttributeValue("Time").toString();
 
-                                                    Log.e("Feature selected", "" + feature.getAttributes());
+                                                    Log.i("Feature selected", "" + feature.getAttributes());
 
                                                     // Show information if user is owner of the point
                                                     if (user_id.equals(featureUser_ID)) {
@@ -240,20 +269,18 @@ public class MainActivity extends AppCompatActivity {
                                                         callout.setStyle(R.xml.tracked_point);
                                                         callout.setContent(loadView(featureUser_ID, featureUsername, featureVehicle, featureTime));
                                                         callout.show((Point) feature.getGeometry());
-                                                    } else {
-                                                        if (callout != null && callout.isShowing()) {
-                                                            callout.hide();
-                                                        }
                                                     }
 
                                                 } else {
+
+                                                    // If no point was found, hide popup and clean attribute graphic layer
                                                     if (callout != null && callout.isShowing()) {
                                                         callout.hide();
-
+                                                        graphicsAttLayer.removeAll();
                                                     }
+
                                                 }
 
-                                                fLayer.clearSelection();
                                             }
                                         }
 
@@ -261,15 +288,6 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
                         });
-
-
-                // Create a personal FeatureLayer and add to map
-                user_id = userCredentials.getUserid();
-
-                if (user_id.equals("null")) {
-                    // Load FeatureLayer for user_id
-                    new QueryFeatureLayer().execute(user_id);
-                }
 
 
             } else {
@@ -363,6 +381,54 @@ public class MainActivity extends AppCompatActivity {
 
         return true;
 
+    }
+
+    /**
+     * Method to get all tracked points from a given user
+     * and draw to attribute graphics layer
+     */
+    public void addUserPointsToGraphic() {
+
+
+        // Define a new query and set parameters
+        final QueryParameters mParams = new QueryParameters();
+        String whereClause = "UserID='" + user_id + "'";
+        mParams.setWhere(whereClause);
+        mParams.setReturnGeometry(true);
+
+
+        fLayer.selectFeatures(mParams, FeatureLayer.SelectionMode.NEW, new CallbackListener<FeatureResult>() {
+            @Override
+            public void onCallback(FeatureResult objects) {
+
+                // Define a new marker symbol for the result graphics
+                SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.RED, 10, SimpleMarkerSymbol.STYLE.CIRCLE);
+
+                // iterate through results
+                for (Object element : objects) {
+                    // if object is feature cast to feature
+
+                    // draw point to graphics layer
+                    if (element instanceof Feature) {
+
+                        Feature feature = (Feature) element;
+
+                        Graphic graphic = new Graphic(feature.getGeometry(), sms, feature.getAttributes());
+                        graphicsLayer.addGraphic(graphic);
+
+                    }
+
+
+                }
+
+
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                Log.i("Tab", "OnError");
+            }
+        });
     }
 
     /**
@@ -564,6 +630,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Method to prepare attributes of points to add into Filegeodatabase
+     *
      * @param newLocation - tracked point
      */
     private void addFeatureToLocalgeodatabase(Point newLocation) {
@@ -617,6 +684,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Method to add point to graphics layer
+     *
      * @param newLocation - tracked point
      */
     private void updateGraphic(Point newLocation) {
@@ -629,6 +697,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Method to identify running services
+     *
      * @param serviceClass - service class to check
      */
     private boolean isMyServiceRunning(Class<?> serviceClass) {
@@ -709,6 +778,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Method to show toasts
+     *
      * @param message - text to show
      */
     public void showToast(final String message) {
@@ -846,13 +916,6 @@ public class MainActivity extends AppCompatActivity {
         alert.show();
     }
 
-    /**
-     * Method to initialize new QueryFeatureLayer
-     */
-    public void updateQueryFeatureLayer() {
-        String user_id = userCredentials.getUserid();
-        new QueryFeatureLayer().execute(user_id);
-    }
 
     /**
      * Getter Method for MainActivity

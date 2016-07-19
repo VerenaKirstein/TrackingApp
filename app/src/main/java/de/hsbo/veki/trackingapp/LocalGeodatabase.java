@@ -183,7 +183,9 @@ public class LocalGeodatabase {
                 if (sucessState.equals("Completed")) {
                     Log.i(MainActivity.TAG, status.getStatus().toString());
                     mainActivity.showToast("Syncronisation abgeschlossen");
-                    new QueryFeatureLayer().execute(user_id);
+
+                    // Add user tracked points to graphic
+                    mainActivity.addUserPointsToGraphic();
                 }
 
             }
