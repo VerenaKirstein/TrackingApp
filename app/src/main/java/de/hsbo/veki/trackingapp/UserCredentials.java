@@ -53,25 +53,23 @@ public class UserCredentials {
         editor.apply();
     }
 
-    
+    /**
+     * Getter methods
+     * @return - attribute
+     */
     public String getUserid() {
         return userid;
     }
 
+    /**
+     * Setter methods
+     * @param userid - value to set
+     */
     public void setUserid(String userid) {
         setToSharedPreferences("UserID", userid);
         this.userid = userid;
     }
 
-/**
-     * Getter methods
-     * @return - attribute
-     */
-     
-    /**
-     * Setter methods
-     * @param userid - value to set
-     */
     public String getUsername() {
         return username;
     }
