@@ -153,10 +153,8 @@ public class LocalGeodatabase {
 
     /**
      * Syncronice local Filegeodatabase with ArcGIS-Feature-Layer
-     *
-     * @throws Exception
      */
-    public void syncGeodatabase(final String user_id) throws Exception {
+    public void syncGeodatabase() throws Exception {
 
         Log.i(MainActivity.TAG, "Sync geodatabase from " + this.filePath);
         SyncGeodatabaseParameters params = geodatabase.getSyncParameters();
@@ -184,8 +182,11 @@ public class LocalGeodatabase {
                     Log.i(MainActivity.TAG, status.getStatus().toString());
                     mainActivity.showToast("Syncronisation abgeschlossen");
 
+                    // clean graphics layer
+                    mainActivity.cleanGraphicLayer();
                     // Add user tracked points to graphic
                     mainActivity.addUserPointsToGraphic();
+
                 }
 
             }
@@ -240,7 +241,7 @@ public class LocalGeodatabase {
                 //String sucessState = status.getStatus().toString();
 
                 if (status.getStatus() == GeodatabaseStatusInfo.Status.COMPLETED) {
-                    mainActivity.updateQueryFeatureLayer();
+                    mainActivity.addUserPointsToGraphic();
 
 
                 }

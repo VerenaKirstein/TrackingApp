@@ -233,6 +233,12 @@ public class MainActivity extends AppCompatActivity {
                                         @Override
                                         public void onSingleTap(final float x, final float y) {
 
+                                            // If no point was found, hide popup and clean attribute graphic layer
+                                            if (callout != null && callout.isShowing()) {
+                                                callout.hide();
+                                                graphicsAttLayer.removeAll();
+                                            }
+
                                             // if user_id is set
                                             if (!user_id.equals("null")) {
 
@@ -269,14 +275,6 @@ public class MainActivity extends AppCompatActivity {
                                                         callout.setStyle(R.xml.tracked_point);
                                                         callout.setContent(loadView(featureUser_ID, featureUsername, featureVehicle, featureTime));
                                                         callout.show((Point) feature.getGeometry());
-                                                    }
-
-                                                } else {
-
-                                                    // If no point was found, hide popup and clean attribute graphic layer
-                                                    if (callout != null && callout.isShowing()) {
-                                                        callout.hide();
-                                                        graphicsAttLayer.removeAll();
                                                     }
 
                                                 }
@@ -333,7 +331,7 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(context, "Beginne Syncronistation!", Toast.LENGTH_SHORT).show();
                 try {
 
-                    localGeodatabase.syncGeodatabase(user_id);
+                    localGeodatabase.syncGeodatabase();
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -689,7 +687,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void updateGraphic(Point newLocation) {
 
-        SimpleMarkerSymbol resultSymbolact = new SimpleMarkerSymbol(Color.RED, 16, SimpleMarkerSymbol.STYLE.CROSS);
+        SimpleMarkerSymbol resultSymbolact = new SimpleMarkerSymbol(Color.MAGENTA, 16, SimpleMarkerSymbol.STYLE.CROSS);
         Graphic graphic = new Graphic(newLocation, resultSymbolact);
         graphicsLayer.addGraphic(graphic);
 
@@ -914,6 +912,13 @@ public class MainActivity extends AppCompatActivity {
                 });
         final AlertDialog alert = builder.create();
         alert.show();
+    }
+
+    /**
+     * Method to clean graphics layer
+     */
+    public void cleanGraphicLayer() {
+        graphicsLayer.removeAll();
     }
 
 
